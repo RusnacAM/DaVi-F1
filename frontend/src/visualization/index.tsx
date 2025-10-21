@@ -24,9 +24,9 @@ export const Visualization = () => {
   });
 
   return (
-    <>
-      <h1>Get F1 Data</h1>
-      <div>
+    <div className="visualization-container">
+      <h1 className="visualization-title">Get F1 Data</h1>
+      <div className="visualization-chart">
         {loadingState && <p>Loading data...</p>}
         {data && (
           <Plot
@@ -42,9 +42,10 @@ export const Visualization = () => {
               width: 800,
               height: 500
             }}
+            config={{ responsive: true }}
           />
         )}
       </div>
-    </>
+    </div>
   );
 };
