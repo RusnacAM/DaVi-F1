@@ -1,26 +1,17 @@
-import axios from "axios";
 import "../App.css";
 import { useEffect, useState } from "react";
 import Plot from "react-plotly.js";
+import { fetchTelemetry, type TelemetryResponse } from "../api/fetchTelemetry";
 
 export const Visualization = () => {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<TelemetryResponse | null>(null);
   const [loadingState, setLoadingState] = useState(false);
-
-  const apiClient = axios.create({
-    baseURL: "http://127.0.0.1:8000/api/v1",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
 
   const fetchData = async () => {
     try {
       setLoadingState(true);
-      const response = await apiClient.get(
-        "/telemetry?driver=VET&session_year=2019&session_name=Monza"
-      );
-      setData(response.data);
+      const response = await fetchTelemetry("VET", "2019", "Monza");
+      setData(response);
       setLoadingState(false);
     } catch (error) {
       setLoadingState(false);
@@ -41,8 +32,8 @@ export const Visualization = () => {
           <Plot
             data={[
               {
-                x: data["distance"],
-                y: data["speed"],
+                x: data.distance,
+                y: data.speed,
                 type: "scatter",
                 marker: { color: "red" },
               },
