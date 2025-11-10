@@ -6,10 +6,24 @@
   width: 100%;
 }
 
-.visualization-title {
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
   margin-top: 30px;
+  width: 850px;
+}
+
+.navbar {
   text-align: center;
   font-size: 2rem;
+  color: #fff;
+  padding: 1rem;
+  width: 100%;
+  border-bottom: 2px rgb(68, 66, 66) solid;
+
 }
 
 .visualization-chart {
@@ -17,5 +31,19 @@
   display: flex;
   align-items: center; 
   justify-content: center;
+  border-radius: 4px;
+  box-shadow: rgb(82, 82, 82) 0.1rem 0.1rem 0.3rem;
+  border: 2px solid rgb(82, 82, 82);
+  color: white;
+  background-color: rgb(25, 27, 31);
   width: 100%;
+  min-height: 600px;
+  flex-shrink: 0;
+}
+
+.filters {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
 }

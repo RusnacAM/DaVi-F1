@@ -4,7 +4,7 @@ This is a visualization of F1 data based on the FastF1 API.
 
 ## Get Started
 
-This project was built with React + Vite + Typescript.
+This project was built with React + Vite + Typescript. Visualization with D3.js
 
 ### Prerequisites:
 
@@ -33,3 +33,5 @@ cd frontend
 npm ci
 npm run dev
 ```
+
+Note: in order to run this project don't forget to add a .env with VITE_API_BASE_URL={your_url}
