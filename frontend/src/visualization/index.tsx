@@ -1,13 +1,17 @@
 import "../App.css";
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
-import { fetchGearData, type GearDataResponse } from "../api/fetchGearData";
 import { FilterSelect } from "../components/FilterSelect";
 import { raceTypes, sessions, years } from "../utils/data";
 import { Button, CircularProgress } from "@mui/material";
+import {
+  fetchTrackDominance,
+  type TrackDominancePoint,
+  type TrackDominanceResponse,
+} from "../api/fetchTrackDominance";
 
 export const Visualization = () => {
-  const [data, setData] = useState<GearDataResponse | null>(null);
+  const [data, setData] = useState<TrackDominanceResponse>([]);
   const [sessionYear, setSessionYear] = useState<string>("2025");
   const [sessionName, setSessionName] = useState<string>("");
   const [sessionIdentifier, setSessionIdentifier] = useState<string>("Race");
@@ -19,10 +23,12 @@ export const Visualization = () => {
   const fetchData = async () => {
     try {
       setLoadingState(true);
-      const response = await fetchGearData(
+      const response = await fetchTrackDominance(
         sessionYear,
         sessionName,
-        sessionIdentifier
+        sessionIdentifier,
+        "VER",
+        "NOR"
       );
       setData(response);
     } catch (error) {
@@ -34,7 +40,7 @@ export const Visualization = () => {
   };
 
   useEffect(() => {
-    if (!data) fetchData();
+    if (data.length === 0) fetchData();
   }, []);
 
   useEffect(() => {
@@ -43,12 +49,13 @@ export const Visualization = () => {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const width = 800;
-    const height = 600;
+    const width = 700;
+    const height = 500;
     const margin = 10;
 
     const xExtent = d3.extent(data, (d) => d.x) as [number, number];
     const yExtent = d3.extent(data, (d) => d.y) as [number, number];
+
     const xScale = d3
       .scaleLinear()
       .domain(xExtent)
@@ -58,56 +65,50 @@ export const Visualization = () => {
       .domain(yExtent)
       .range([height - margin, margin]);
 
-    const gearColor = d3
-      .scaleOrdinal<number, string>()
-      .domain([1, 2, 3, 4, 5, 6, 7, 8])
-      .range(d3.schemePaired);
+    const colorScale = d3
+      .scaleOrdinal<string>()
+      .domain([...new Set(data.map((d) => d.fastest_driver))])
+      .range(d3.schemeTableau10);
 
-    for (let i = 0; i < data.length - 1; i++) {
+    const sectors = d3.group(data, (d) => d.minisector);
+
+    const line = d3
+      .line<TrackDominancePoint>()
+      .x((d) => xScale(d.x))
+      .y((d) => yScale(d.y));
+
+    for (const [, points] of sectors) {
       svg
-        .append("line")
-        .attr("x1", xScale(data[i].x))
-        .attr("y1", yScale(data[i].y))
-        .attr("x2", xScale(data[i + 1].x))
-        .attr("y2", yScale(data[i + 1].y))
-        .attr("stroke", gearColor(data[i].gear))
-        .attr("stroke-width", 15)
-        .attr("stroke-linecap", "round");
+        .append("path")
+        .datum(points)
+        .attr("fill", "none")
+        .attr("stroke", colorScale(points[0].fastest_driver)!)
+        .attr("stroke-width", 8)
+        .attr("d", line);
     }
 
-    const tooltip = d3
-      .select(".visualization-container")
-      .append("div")
-      .style("position", "absolute")
-      .style("pointer-events", "none")
-      .style("background", "rgba(0,0,0,0.7)")
-      .style("color", "#fff")
-      .style("padding", "4px 8px")
-      .style("border-radius", "4px")
-      .style("font-size", "12px")
-      .style("visibility", "hidden");
-
-    // Add invisible circles for hover
-    svg
-      .selectAll("circle")
-      .data(data)
+    // --- Legend ---
+    const drivers = Array.from(new Set(data.map((d) => d.fastest_driver)));
+    const legend = svg
+      .selectAll(".legend")
+      .data(drivers)
       .enter()
-      .append("circle")
-      .attr("cx", (d) => xScale(d.x))
-      .attr("cy", (d) => yScale(d.y))
-      .attr("r", 6) // small radius for easy hover
-      .attr("fill", "transparent")
-      .on("mouseover", (_, d) => {
-        tooltip.style("visibility", "visible").text(`Gear: ${d.gear}`);
-      })
-      .on("mousemove", (event) => {
-        tooltip
-          .style("top", event.pageY + 10 + "px")
-          .style("left", event.pageX + 10 + "px");
-      })
-      .on("mouseout", () => {
-        tooltip.style("visibility", "hidden");
-      });
+      .append("g")
+      .attr("transform", (_, i) => `translate(0, ${30 + i * 20})`);
+
+    legend
+      .append("rect")
+      .attr("width", 12)
+      .attr("height", 12)
+      .attr("fill", (d) => colorScale(d)!);
+
+    legend
+      .append("text")
+      .attr("x", 20)
+      .attr("y", 10)
+      .attr("font-size", 12)
+      .attr("fill", "white")
+      .text((d) => d);
   }, [data]);
 
   useEffect(() => {
@@ -120,7 +121,7 @@ export const Visualization = () => {
 
   return (
     <div className="visualization-container">
-      <nav className="navbar">Fastest Lap Gear Shifts</nav>
+      <nav className="navbar">Track Dominance</nav>
 
       <div className="chart-container">
         <div className="filters">
@@ -160,13 +161,9 @@ export const Visualization = () => {
             )}
           </Button>
         </div>
-
-        <div className="visualization-chart">
-          {loadingState && <p>Loading data...</p>}
-          {data && !loadingState && (
-            <svg ref={svgRef} width={800} height={600}></svg>
-          )}
-        </div>
+        {data && !loadingState && (
+          <svg ref={svgRef} width={700} height={500}></svg>
+        )}
       </div>
     </div>
   );
