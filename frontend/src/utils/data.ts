@@ -252,7 +252,7 @@ export const drivers: Driver = {
     "Logan Sargeant",
     "Alexander Albon",
     "Franco Colapinto",
-    "Zhou Guanyu",
+    "Guanyu Zhou",
     "Valtteri Bottas",
     "Kevin Magnussen",
     "Nico Hülkenberg"
@@ -276,7 +276,7 @@ export const drivers: Driver = {
     "Yuki Tsunoda",
     "Logan Sargeant",
     "Alexander Albon",
-    "Zhou Guanyu",
+    "Guanyu Zhou",
     "Valtteri Bottas",
     "Kevin Magnussen",
     "Nico Hülkenberg"
@@ -300,7 +300,7 @@ export const drivers: Driver = {
     "Nicholas Latifi",
     "Alexander Albon",
     "Nyck de Vries",
-    "Zhou Guanyu",
+    "Guanyu Zhou",
     "Valtteri Bottas",
     "Kevin Magnussen",
     "Mick Schumacher"

@@ -158,7 +158,7 @@ export const Visualization = () => {
             value={driverName}
             setValue={setDriverName}
             menuItems={drivers[sessionYear]}
-            width={180}
+            width={200}
           />
 
           <Button
