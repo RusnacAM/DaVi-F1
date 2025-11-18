@@ -2,7 +2,7 @@ import "../App.css";
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { FilterSelect } from "../components/FilterSelect";
-import { raceTypes, sessions, years } from "../utils/data";
+import { raceTypes, sessions, years, drivers } from "../utils/data";
 import { Button, CircularProgress } from "@mui/material";
 import {
   fetchTrackDominance,
@@ -15,10 +15,12 @@ export const Visualization = () => {
   const [sessionYear, setSessionYear] = useState<string>("2025");
   const [sessionName, setSessionName] = useState<string>("Australian Grand Prix");
   const [sessionIdentifier, setSessionIdentifier] = useState<string>("Race");
+  const [driverName, setDriverName] = useState<string>("");
   const [loadingState, setLoadingState] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const sessionList = sessions[sessionYear] ?? [];
+  const driverList = drivers[sessionYear] ?? [];
 
   const fetchData = async () => {
     try {
@@ -27,8 +29,7 @@ export const Visualization = () => {
         sessionYear,
         sessionName,
         sessionIdentifier,
-        "VER",
-        "NOR"
+        driverName
       );
       setData(response);
     } catch (error) {
@@ -134,6 +135,12 @@ export const Visualization = () => {
     } else {
       setSessionName("");
     }
+
+    if (driverList.length > 0) {
+      setDriverName(driverList[0]);
+    } else {
+      setDriverName("");
+    }
   }, [sessionYear]);
 
   return (
@@ -161,6 +168,13 @@ export const Visualization = () => {
             setValue={setSessionIdentifier}
             menuItems={raceTypes}
             width={150}
+          />
+
+          <FilterSelect
+            value={driverName}
+            setValue={setDriverName}
+            menuItems={drivers[sessionYear]}
+            width={200}
           />
 
           <Button

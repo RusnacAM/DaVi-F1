@@ -36,11 +36,11 @@ def get_telemetry(driver: str, session_year: int, session_name: str, identifier:
     }
     
 @app.get("/api/v1/gear-data")
-def get_gear_data(session_year: int, session_name: str, identifier: str):
+def get_gear_data(session_year: int, session_name: str, identifier: str, driver: str):
     session = ff1.get_session(session_year, session_name, identifier)
     session.load()
 
-    lap = session.laps.pick_fastest()
+    lap = session.laps.pick_drivers(driver).pick_fastest()
     telemetry = lap.get_telemetry()
     
     data = pd.DataFrame({
