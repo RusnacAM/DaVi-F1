@@ -5,8 +5,7 @@ export interface TrackDominancePoint {
   y: number;
   minisector: number;
   fastest_driver: string;
-  fastest_driver_int: number;
-  speed: number;
+  time_diff: number;
 }
 
 export type TrackDominanceResponse = TrackDominancePoint[];

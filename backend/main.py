@@ -81,17 +81,23 @@ def get_track_dominance(session_year: int, session_name: str, identifier: str, d
     )
 
     average_speed = telemetry_drivers.groupby(['Minisector', 'Driver'])['Speed'].mean().reset_index()
+    average_time = telemetry_drivers.groupby(['Minisector', 'Driver'])['Time'].mean().reset_index()
     fastest_driver = average_speed.loc[average_speed.groupby(['Minisector'])['Speed'].idxmax()]
 
     fastest_driver = fastest_driver[['Minisector', 'Driver']].rename(columns={'Driver': 'Fastest_driver'})
     telemetry_drivers = telemetry_drivers.merge(fastest_driver, on=['Minisector'])
     telemetry_drivers = telemetry_drivers.sort_values(by=['Distance'])
     
+    minisector_time_diff = average_time.pivot(index='Minisector', columns='Driver', values='Time').reset_index()
+    minisector_time_diff['Time_diff'] = minisector_time_diff[driver01] - minisector_time_diff[driver02]
+    telemetry_drivers = telemetry_drivers.merge(minisector_time_diff[['Minisector', 'Time_diff']], on='Minisector', how='left')
+    
     data = pd.DataFrame({
       "x": telemetry_drivers["X"],
       "y": telemetry_drivers["Y"],
       "minisector": telemetry_drivers["Minisector"],
       "fastest_driver": telemetry_drivers["Fastest_driver"],
+      "time_diff": telemetry_drivers["Time_diff"]
     })
     
     return data.to_dict(orient="records")

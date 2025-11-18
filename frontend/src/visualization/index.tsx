@@ -13,7 +13,7 @@ import {
 export const Visualization = () => {
   const [data, setData] = useState<TrackDominanceResponse>([]);
   const [sessionYear, setSessionYear] = useState<string>("2025");
-  const [sessionName, setSessionName] = useState<string>("");
+  const [sessionName, setSessionName] = useState<string>("Australian Grand Prix");
   const [sessionIdentifier, setSessionIdentifier] = useState<string>("Race");
   const [loadingState, setLoadingState] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -85,6 +85,23 @@ export const Visualization = () => {
         .attr("stroke", colorScale(points[0].fastest_driver)!)
         .attr("stroke-width", 8)
         .attr("d", line);
+
+      const midIndex = Math.floor(points.length / 2);
+      const midPoint = points[midIndex];
+
+      // Add minisector label
+      svg
+        .append("text")
+        .attr("x", xScale(midPoint.x))
+        .attr("y", yScale(midPoint.y))
+        .attr("text-anchor", "middle")
+        .attr("alignment-baseline", "middle")
+        .attr("font-size", 10)
+        .attr("fill", "white")
+        .attr("stroke", "black")
+        .attr("stroke-width", 0.5)
+        .attr("paint-order", "stroke") // keeps text visible over bright lines
+        .text(midPoint.minisector);
     }
 
     // --- Legend ---
