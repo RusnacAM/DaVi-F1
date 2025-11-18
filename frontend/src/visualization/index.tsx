@@ -29,7 +29,8 @@ export const Visualization = () => {
         sessionYear,
         sessionName,
         sessionIdentifier,
-        driverName
+        "VER",
+        "NOR"
       );
       setData(response);
     } catch (error) {
