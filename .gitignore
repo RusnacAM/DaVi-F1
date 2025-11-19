@@ -28,3 +28,4 @@ dist-ssr
 __pycache__/
 *.py[codz]
 *$py.class
+Cache/
