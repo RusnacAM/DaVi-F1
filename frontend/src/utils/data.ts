@@ -1,4 +1,4 @@
-export const years: string[] = [
+export const YEARS: string[] = [
   "2025",
   "2024",
   "2023",
@@ -9,11 +9,11 @@ export const years: string[] = [
   "2018",
 ];
 
-export const raceTypes: string[] = ["Race", "Qualifying", "FP3", "FP2", "FP1"];
+export const SESSION_IDENTIFIERS: string[] = ["Race", "Qualifying", "FP3", "FP2", "FP1"];
 
 type Session = Record<string, string[]>;
 
-export const sessions: Session = {
+export const SESSIONS: Session = {
   "2025": [
     "Australian Grand Prix",
     "Chinese Grand Prix",
@@ -207,7 +207,7 @@ export const sessions: Session = {
 
 type Driver = Record<string, string[]>;
 
-export const drivers: Driver = {
+export const DRIVERS: Driver = {
   "2025": [
     "Max Verstappen",
     "Yuki Tsunoda",

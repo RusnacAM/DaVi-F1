@@ -2,30 +2,31 @@ import "../App.css";
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { fetchGearData, type GearDataResponse } from "../api/fetchGearData";
-import { FilterSelect } from "../components/FilterSelect";
-import { raceTypes, sessions, years, drivers } from "../utils/data";
-import { Button, CircularProgress } from "@mui/material";
+import FilterMenu from "../components/filtering/FilterMenu";
+import useFilterConfigs from "../hooks/useFilterConfigs";
 
 export const Visualization = () => {
+
+  const {
+    sessionYears,
+    sessionName,
+    sessionIdentifiers,
+    driverNames
+
+  } = useFilterConfigs();
+
   const [data, setData] = useState<GearDataResponse | null>(null);
-  const [sessionYear, setSessionYear] = useState<string>("2025");
-  const [sessionName, setSessionName] = useState<string>("");
-  const [sessionIdentifier, setSessionIdentifier] = useState<string>("Race");
-  const [driverName, setDriverName] = useState<string>("");
   const [loadingState, setLoadingState] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
-
-  const sessionList = sessions[sessionYear] ?? [];
-  const driverList = drivers[sessionYear] ?? [];
 
   const fetchData = async () => {
     try {
       setLoadingState(true);
       const response = await fetchGearData(
-        sessionYear,
+        sessionYears[0],
         sessionName,
-        sessionIdentifier,
-        driverName
+        sessionIdentifiers[0],
+        driverNames[0]
       );
       setData(response);
     } catch (error) {
@@ -113,69 +114,16 @@ export const Visualization = () => {
       });
   }, [data]);
 
-  useEffect(() => {
-    if (sessionList.length > 0) {
-      setSessionName(sessionList[0]);
-    } else {
-      setSessionName("");
-    }
-
-    if (driverList.length > 0) {
-      setDriverName(driverList[0]);
-    } else {
-      setDriverName("");
-    }
-  }, [sessionYear]);
 
   return (
     <div className="visualization-container">
       <nav className="navbar">Fastest Lap Gear Shifts</nav>
 
       <div className="chart-container">
-        <div className="filters">
-          <FilterSelect
-            value={sessionYear}
-            setValue={setSessionYear}
-            menuItems={years}
-            width={120}
-          />
-
-          <FilterSelect
-            value={sessionName}
-            setValue={setSessionName}
-            menuItems={sessions[sessionYear]}
-            width={220}
-          />
-
-          <FilterSelect
-            value={sessionIdentifier}
-            setValue={setSessionIdentifier}
-            menuItems={raceTypes}
-            width={150}
-          />
-
-          <FilterSelect
-            value={driverName}
-            setValue={setDriverName}
-            menuItems={drivers[sessionYear]}
-            width={200}
-          />
-
-          <Button
-            variant="contained"
-            onClick={fetchData}
-            disabled={!sessionYear || !sessionName || loadingState}
-            sx={{
-              marginLeft: "auto",
-            }}
-          >
-            {loadingState ? (
-              <CircularProgress size={20} color="primary" />
-            ) : (
-              "Select"
-            )}
-          </Button>
-        </div>
+        <FilterMenu 
+          onClickSelect={fetchData}
+          isLoading={loadingState}
+        />
 
         <div className="visualization-chart">
           {loadingState && <p>Loading data...</p>}
