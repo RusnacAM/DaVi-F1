@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import math
 
-from sectors import sector_dict
+from backend.utils.sectors import sector_dict
 
 ### Track Dominance function ###
 def get_track_dominance(drivers, session_name: str, session_year: int, identifier: str):
