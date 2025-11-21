@@ -16,14 +16,9 @@ export const Visualization = () => {
     sessionName,
     sessionIdentifiers,
     driverNames
-
   } = useFilterConfigs();
 
   const [data, setData] = useState<TrackDominanceResponse>([]);
-  const [sessionYear, setSessionYear] = useState<string>("2025");
-  const [sessionName, setSessionName] = useState<string>("Australian Grand Prix");
-  const [sessionIdentifier, setSessionIdentifier] = useState<string>("Race");
-  const [driverName, setDriverName] = useState<string>("");
   const [loadingState, setLoadingState] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -34,8 +29,7 @@ export const Visualization = () => {
         sessionYears[0],
         sessionName,
         sessionIdentifiers[0],
-        "VER",
-        "NOR"s[0]
+        driverNames
       );
       setData(response);
     } catch (error) {

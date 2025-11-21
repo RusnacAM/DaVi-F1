@@ -8,6 +8,5 @@ export interface GearDataResponse {
 }
 
 export const fetchGearData = async (sessionYear: string, sessionName: string, identifier: string, driverName: string): Promise<GearDataResponse> => {
-  console.log(driverCode[driverName], identifierMap[identifier])
   return await apiRequest<GearDataResponse>(`/gear-data?session_year=${sessionYear}&session_name=${sessionName}&identifier=${identifierMap[identifier]}&driver=${driverCode[driverName]}`, 'GET')
 };

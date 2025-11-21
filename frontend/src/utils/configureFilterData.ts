@@ -14,6 +14,7 @@ export const driverCode: Record<string, string> = Object.values(DRIVERS)
     const specialCharMap: Record<string, string> = {
       É: "E",
       Ü: "U",
+      Ä: "A"
     };
 
     const replaceSpecialChars = (str: string): string =>
