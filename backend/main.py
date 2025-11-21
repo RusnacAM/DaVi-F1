@@ -1,9 +1,10 @@
 from typing import Union
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 import fastf1 as ff1
 import pandas as pd
 import os
+from typing import List
 
 cache_dir = "Cache"
 os.makedirs(cache_dir, exist_ok=True)
@@ -24,16 +25,27 @@ def read_root():
     return {"Test F1 Server"}
 
 @app.get("/api/v1/telemetry")
-def get_telemetry(driver: str, session_year: int, session_name: str, identifier: str):
-    session = ff1.get_session(session_year, session_name, identifier)
-    session.load()
+def get_telemetry(session_year: int, session_name: str, identifier: str, drivers: List[str] = Query(None)):
+    session_event = ff1.get_session(session_year, session_name, identifier)
+    session_event.load()
 
-    driver_laps = session.laps.pick_drivers(driver).pick_fastest()
-    telemetry = driver_laps.get_car_data().add_distance()
-    return {
-        "distance": telemetry["Distance"].tolist(),
-        "speed": telemetry["Speed"].tolist()
-    }
+    result = {}
+    for driver in drivers:
+        fastest_lap = session_event.laps.pick_drivers(driver).pick_fastest()
+        car_data = fastest_lap.get_car_data()
+        telemetry = pd.DataFrame({
+            "time": car_data["Time"],
+            "speed": car_data["Speed"],
+            "RPM": car_data["RPM"],
+            "nGear": car_data["nGear"],
+            "Throttle": car_data["Throttle"],
+            "Brake": car_data["Brake"].astype(int),
+            "DRS": car_data["DRS"]
+        }).astype(object)
+        
+        result[driver] = telemetry.to_dict(orient="records")
+    
+    return result
     
 @app.get("/api/v1/gear-data")
 def get_gear_data(session_year: int, session_name: str, identifier: str, driver: str):
