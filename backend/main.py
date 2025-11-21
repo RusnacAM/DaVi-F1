@@ -5,6 +5,7 @@ import fastf1 as ff1
 import pandas as pd
 import os
 from typing import List
+from functools import lru_cache
 
 cache_dir = "Cache"
 os.makedirs(cache_dir, exist_ok=True)
@@ -20,18 +21,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@lru_cache(maxsize=128)
+def get_loaded_session(year, name, identifier):
+    s = ff1.get_session(year, name, identifier)
+    s.load()
+    return s
+
 @app.get("/api/v1/")
 def read_root():
     return {"Test F1 Server"}
 
 @app.get("/api/v1/telemetry")
 def get_telemetry(session_year: int, session_name: str, identifier: str, drivers: List[str] = Query(None)):
-    session_event = ff1.get_session(session_year, session_name, identifier)
-    session_event.load()
+    session = get_loaded_session(session_year, session_name, identifier)
 
     result = {}
     for driver in drivers:
-        fastest_lap = session_event.laps.pick_drivers(driver).pick_fastest()
+        fastest_lap = session.laps.pick_drivers(driver).pick_fastest()
         car_data = fastest_lap.get_car_data()
         telemetry = pd.DataFrame({
             "time": car_data["Time"],
@@ -49,8 +55,7 @@ def get_telemetry(session_year: int, session_name: str, identifier: str, drivers
     
 @app.get("/api/v1/gear-data")
 def get_gear_data(session_year: int, session_name: str, identifier: str, driver: str):
-    session = ff1.get_session(session_year, session_name, identifier)
-    session.load()
+    session = get_loaded_session(session_year, session_name, identifier)
 
     lap = session.laps.pick_drivers(driver).pick_fastest()
     telemetry = lap.get_telemetry()
@@ -65,11 +70,10 @@ def get_gear_data(session_year: int, session_name: str, identifier: str, driver:
 
 @app.get("/api/v1/track-dominance")
 def get_track_dominance(session_year: int, session_name: str, identifier: str, driver01: str, driver02: str):
-    session_event = ff1.get_session(session_year, session_name, identifier)
-    session_event.load()
+    session = get_loaded_session(session_year, session_name, identifier)
 
-    fastest_lap_driver01 = session_event.laps.pick_drivers(driver01).pick_fastest()
-    fastest_lap_driver02 = session_event.laps.pick_drivers(driver02).pick_fastest()
+    fastest_lap_driver01 = session.laps.pick_drivers(driver01).pick_fastest()
+    fastest_lap_driver02 = session.laps.pick_drivers(driver02).pick_fastest()
 
     telemetry_driver01 = fastest_lap_driver01.get_telemetry().add_distance()
     telemetry_driver02 = fastest_lap_driver02.get_telemetry().add_distance()
