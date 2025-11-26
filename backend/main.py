@@ -41,9 +41,10 @@ def get_telemetry(session_year: int, session_name: str, identifier: str, drivers
     result = {}
     for driver in drivers:
         fastest_lap = session.laps.pick_drivers(driver).pick_fastest()
-        car_data = fastest_lap.get_car_data()
+        car_data = fastest_lap.get_telemetry().add_distance()
         telemetry = pd.DataFrame({
             "time": car_data["Time"],
+            "distance": car_data["Distance"],
             "speed": car_data["Speed"],
             "RPM": car_data["RPM"],
             "nGear": car_data["nGear"],
@@ -122,3 +123,31 @@ def get_track_dominance(session_name: str, session_year: int, identifier: str,  
     })
     
     return data.to_dict(orient="records")
+
+@app.get("/api/v1/braking-comparison")
+def braking_comparison(session_year: int, session_name: str, identifier: str, driver: str):
+    session = get_loaded_session(session_year, session_name, identifier)
+
+    lap = session.laps.pick_drivers(driver).pick_fastest()
+
+    if lap is None:
+        return {"error": f"No laps for driver {driver}"}
+
+    telemetry = lap.get_telemetry().add_distance()
+
+    # Driver brake pedal (0 or 1)
+    driver_brake = telemetry["Brake"].astype(int).values
+    distance = telemetry["Distance"].values
+
+    # Simple ideal brake estimation (drops when speed slows quickly)
+    speed = telemetry["Speed"].values
+    ideal_brake = np.gradient(speed) < -1.5  
+    ideal_brake = ideal_brake.astype(int)
+
+    df = pd.DataFrame({
+        "distance": distance,
+        "ideal_brake": ideal_brake,
+        "driver_brake": driver_brake
+    })
+
+    return df.to_dict(orient="records")
