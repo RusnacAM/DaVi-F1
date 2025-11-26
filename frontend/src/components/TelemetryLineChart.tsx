@@ -35,7 +35,7 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
       }))
     );
 
-    const xExtent = d3.extent(allPoints, (d) => d.time) as [number, number];
+    const xExtent = d3.extent(allPoints, (d) => d.distance) as [number, number];
     const yExtent = d3.extent(allPoints, (d) => d[metric]) as [number, number];
 
     const xScale = d3
@@ -54,7 +54,7 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
 
     const line = d3
       .line<any>()
-      .x((d) => xScale(d.time))
+      .x((d) => xScale(d.distance))
       .y((d) => yScale(d[metric]));
 
     drivers.forEach((driver) => {
@@ -70,7 +70,7 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
     svg
       .append("g")
       .attr("transform", `translate(0, ${height - margin})`)
-      .call(d3.axisBottom(xScale).ticks(5))
+      .call(d3.axisBottom(xScale).ticks(10))
       .attr("color", "white");
 
     svg
@@ -85,7 +85,7 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
       .attr("y", margin / 2)
       .attr("fill", "white")
       .style("font-size", "14px")
-      .text(label ?? metric);
+      .text("Distance along lap [m]");
   }, [data, metric]);
 
   return <svg ref={svgRef} width={1200} height={300}></svg>;

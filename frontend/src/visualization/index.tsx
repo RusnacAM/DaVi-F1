@@ -3,11 +3,24 @@ import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import FilterMenu from "../components/filtering/FilterMenu";
 import useFilterConfigs from "../hooks/useFilterConfigs";
+import { TelemetryLineChart } from "../components/TelemetryLineChart";
 import {
   fetchTrackDominance,
   type TrackDominancePoint,
   type TrackDominanceResponse,
 } from "../api/fetchTrackDominance";
+
+import {
+  fetchBrakingComparison,
+  type BrakingPoint
+} from "../api/fetchBrakingComparison";
+
+import { BrakingComparison } from "../visualization/BrakingComparison";
+
+import {
+  fetchTelemetry,
+  type TelemetryResponse
+} from "../api/fetchTelemetry";
 
 export const Visualization = () => {
 
@@ -19,6 +32,9 @@ export const Visualization = () => {
   } = useFilterConfigs();
 
   const [data, setData] = useState<TrackDominanceResponse>([]);
+  const [telemetryData, setTelemetryData] = useState<TelemetryResponse | null>(null);
+  const [brakingData, setBrakingData] = useState<BrakingPoint[] | null>(null);
+  const [activeTab, setActiveTab] = useState<"dominance" | "braking">("dominance");
   const [loadingState, setLoadingState] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -32,6 +48,29 @@ export const Visualization = () => {
         driverNames
       );
       setData(response);
+
+      const mainDriver = driverNames[0];
+      const brakingResp = await fetchBrakingComparison(
+        sessionYears[0],
+        sessionName,
+        sessionIdentifiers[0],
+        mainDriver
+      );
+
+      setBrakingData(brakingResp && brakingResp.length ? brakingResp : null);
+
+      const telemetryResp = await fetchTelemetry(
+        sessionYears[0],
+        sessionName,
+        sessionIdentifiers[0],
+        driverNames
+      );
+
+      setTelemetryData(
+        telemetryResp && Object.keys(telemetryResp).length
+          ? telemetryResp
+          : null
+      );
     } catch (error) {
       setLoadingState(false);
       console.error("Error fetching data:", error);
@@ -139,8 +178,81 @@ export const Visualization = () => {
           onClickSelect={fetchData}
           isLoading={loadingState}
         />
-        {data && !loadingState && (
-          <svg ref={svgRef} width={700} height={500}></svg>
+        <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+          <button
+            onClick={() => setActiveTab("dominance")}
+            style={{
+              color: "black",
+              padding: "8px 16px",
+              borderRadius: "6px",
+              border: "1px solid #ccc",
+              background: activeTab === "dominance" ? "#ddd" : "#f7f7f7",
+              fontWeight: activeTab === "dominance" ? "600" : "400",
+            }}
+          >
+            Track Dominance
+          </button>
+
+          <button
+            onClick={() => setActiveTab("braking")}
+            style={{
+              color: "black",
+              padding: "8px 16px",
+              borderRadius: "6px",
+              border: "1px solid #ccc",
+              background: activeTab === "braking" ? "#ddd" : "#f7f7f7",
+              fontWeight: activeTab === "braking" ? "600" : "400",
+            }}
+          >
+            Braking Comparison
+          </button>
+        </div>
+        {activeTab === "dominance" && (
+          <>
+            {data && !loadingState && (
+              <svg ref={svgRef} width={700} height={500}></svg>
+            )}
+          </>
+        )}
+
+        {activeTab === "braking" && (
+          <>
+            <section style={{ marginTop: 40 }}>
+              <h3 style={{ color: "white" }}>
+                Braking Comparison — Ideal Lap vs {driverNames[0]}
+              </h3>
+
+              {loadingState && (
+                <div style={{ color: "white" }}>Loading braking data...</div>
+              )}
+
+              {!loadingState && brakingData && (
+                <BrakingComparison 
+                  data={brakingData}
+                  driverName={driverNames[0]}
+                />
+              )}
+
+              {!loadingState && !brakingData && (
+                <div style={{ color: "#ccc" }}>
+                  No braking data available for this session/driver.
+                </div>
+              )}
+            </section>
+
+            {telemetryData && (
+              <section style={{ marginTop: 40 }}>
+                <h3 style={{ color: "white" }}>Throttle Input Comparison</h3>
+
+                <TelemetryLineChart
+                  data={telemetryData}
+                  metric="Throttle"
+                  label="Throttle (%)"
+                  
+                />
+              </section>
+            )}
+          </>
         )}
       </div>
     </div>
