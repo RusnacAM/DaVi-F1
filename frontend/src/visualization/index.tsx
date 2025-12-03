@@ -8,15 +8,13 @@ import {
   type TrackDominancePoint,
   type TrackDominanceResponse,
 } from "../api/fetchTrackDominance";
+import { driverCode } from "../utils/configureFilterData";
+import areaChart from "../../public/images/area_chart.jpeg";
+import barChart from "../../public/images/bar_chart.jpeg";
 
 export const Visualization = () => {
-
-  const {
-    sessionYears,
-    sessionName,
-    sessionIdentifier,
-    driverNames
-  } = useFilterConfigs();
+  const { sessionYears, sessionName, sessionIdentifier, driverNames } =
+    useFilterConfigs();
 
   const [data, setData] = useState<TrackDominanceResponse>([]);
   const [loadingState, setLoadingState] = useState(false);
@@ -46,11 +44,19 @@ export const Visualization = () => {
 
   useEffect(() => {
     if (!data) return;
+    const driverCodes = driverNames.map((d) => driverCode[d]);
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const width = 700;
+    const legendGroup = svg.append("g").attr("class", "legend-group");
+    const trackGroup = svg
+      .append("g")
+      .attr("class", "track-group")
+      .attr("transform", "translate(50, 0)");
+
+    //  --- Track ---
+    const width = 500;
     const height = 500;
     const margin = 10;
 
@@ -61,6 +67,7 @@ export const Visualization = () => {
       .scaleLinear()
       .domain(xExtent)
       .range([margin, width - margin]);
+
     const yScale = d3
       .scaleLinear()
       .domain(yExtent)
@@ -68,9 +75,10 @@ export const Visualization = () => {
 
     const colorScale = d3
       .scaleOrdinal<string>()
-      .domain([...new Set(data.map((d) => d.fastest_driver))])
-      .range(d3.schemeTableau10);
+      .domain(driverCodes)
+      .range(d3.schemeDark2);
 
+    const startPoint = data[0];
     const sectors = d3.group(data, (d) => d.minisector);
 
     const line = d3
@@ -79,7 +87,7 @@ export const Visualization = () => {
       .y((d) => yScale(d.y));
 
     for (const [, points] of sectors) {
-      svg
+      trackGroup
         .append("path")
         .datum(points)
         .attr("fill", "none")
@@ -90,8 +98,7 @@ export const Visualization = () => {
       const midIndex = Math.floor(points.length / 2);
       const midPoint = points[midIndex];
 
-      // Add minisector label
-      svg
+      trackGroup
         .append("text")
         .attr("x", xScale(midPoint.x))
         .attr("y", yScale(midPoint.y))
@@ -101,15 +108,25 @@ export const Visualization = () => {
         .attr("fill", "white")
         .attr("stroke", "black")
         .attr("stroke-width", 0.5)
-        .attr("paint-order", "stroke") // keeps text visible over bright lines
+        .attr("paint-order", "stroke")
         .text(midPoint.minisector);
     }
 
+    if (startPoint) {
+      trackGroup
+        .append<SVGImageElement>("image")
+        .attr("href", "public/images/start_track.png")
+        .attr("x", xScale(startPoint.x) - 8)
+        .attr("y", yScale(startPoint.y) - 8)
+        .attr("width", 21)
+        .attr("height", 21);
+    }
+
     // --- Legend ---
-    const drivers = Array.from(new Set(data.map((d) => d.fastest_driver)));
-    const legend = svg
+    console.log(driverCodes);
+    const legend = legendGroup
       .selectAll(".legend")
-      .data(drivers)
+      .data(driverCodes)
       .enter()
       .append("g")
       .attr("transform", (_, i) => `translate(0, ${30 + i * 20})`);
@@ -129,20 +146,23 @@ export const Visualization = () => {
       .text((d) => d);
   }, [data]);
 
-
   return (
-    <div className="visualization-container">
-      <nav className="navbar">Track Dominance</nav>
+    <>
+      <nav className="navbar">
+        <FilterMenu onClickSelect={fetchData} isLoading={loadingState} />
+      </nav>
 
       <div className="chart-container">
-        <FilterMenu 
-          onClickSelect={fetchData}
-          isLoading={loadingState}
-        />
-        {data && !loadingState && (
-          <svg ref={svgRef} width={700} height={500}></svg>
-        )}
+        <div className="track-map">
+          {data && !loadingState && (
+            <svg ref={svgRef} width={700} height={500}></svg>
+          )}
+        </div>
+        <div className="supporting-chart">
+          <img src={areaChart} alt="Logo" width={700} height={300} />
+          <img src={barChart} alt="Logo" width={700} height={300} />
+        </div>
       </div>
-    </div>
+    </>
   );
 };
