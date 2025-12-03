@@ -14,7 +14,7 @@ export const Visualization = () => {
   const {
     sessionYears,
     sessionName,
-    sessionIdentifiers,
+    sessionIdentifier,
     driverNames
   } = useFilterConfigs();
 
@@ -28,7 +28,7 @@ export const Visualization = () => {
       const response = await fetchTrackDominance(
         sessionYears[0],
         sessionName,
-        sessionIdentifiers[0],
+        sessionIdentifier,
         driverNames
       );
       setData(response);
