@@ -6,7 +6,7 @@ import numpy as np
 import os
 import math
 
-from sectors import sector_dict
+from utils.sectors import sector_dict
 from typing import List
 from functools import lru_cache
 
@@ -95,7 +95,7 @@ def get_track_dominance(session_name: str, session_year: int, identifier: str,  
         num_minisectors = 12
         sector_bounds = [0] * (num_minisectors + 1)
         total_dist = telemetry_drivers['Distance'].max()
-        print(total_dist)
+
         for i in range(1,num_minisectors+1):
             sector_bounds[i] = math.ceil((i) * (total_dist/num_minisectors))
 
