@@ -3,6 +3,7 @@ import { driverCode } from "../utils/configureFilterData";
 
 export interface TelemetryPoint {
   time: number;
+  distance: number;
   speed: number;
   RPM: number;
   nGear: number;

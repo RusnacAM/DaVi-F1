@@ -22,6 +22,13 @@ import {
   type TelemetryResponse
 } from "../api/fetchTelemetry";
 
+import BrakingDistributionBoxPlot from "../visualization/BrakingDistributionBoxPlot";
+
+import {
+  fetchBrakingDistribution,
+  type BrakingDistributionPoint
+} from "../api/fetchBrakingDistribution";
+
 export const Visualization = () => {
 
   const {
@@ -37,6 +44,7 @@ export const Visualization = () => {
   const [activeTab, setActiveTab] = useState<"dominance" | "braking">("dominance");
   const [loadingState, setLoadingState] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [brakingDist, setBrakingDist] = useState<BrakingDistributionPoint[]>([]);
 
   const fetchData = async () => {
     try {
@@ -71,6 +79,14 @@ export const Visualization = () => {
           ? telemetryResp
           : null
       );
+      const brakingDistResp = await fetchBrakingDistribution(
+        sessionYears[0],
+        sessionName,
+        sessionIdentifiers[0],
+        driverNames
+      );
+
+      setBrakingDist(brakingDistResp);
     } catch (error) {
       setLoadingState(false);
       console.error("Error fetching data:", error);
@@ -216,43 +232,69 @@ export const Visualization = () => {
         )}
 
         {activeTab === "braking" && (
-          <>
-            <section style={{ marginTop: 40 }}>
-              <h3 style={{ color: "white" }}>
-                Braking Comparison — Ideal Lap vs {driverNames[0]}
-              </h3>
+          <div style={{ display: "flex", flexDirection: "row", width: "100%", maxWidth: "100%", gap: "20px", overflow: "auto", alignItems: "flex-start" }}>
+            
+            {/* LEFT — 60% */}
+            <div style={{ width: "60%", minWidth: 0, flex: "0 0 60%", overflow: "auto", maxHeight: "100vh" }}>
+              <section style={{ marginTop: 20 }}>
+                <h3 style={{ color: "white" }}>
+                  Braking Comparison — Ideal Lap vs {driverNames[0]}
+                </h3>
 
-              {loadingState && (
-                <div style={{ color: "white" }}>Loading braking data...</div>
-              )}
+                {loadingState && (
+                  <div style={{ color: "white" }}>Loading braking data...</div>
+                )}
 
-              {!loadingState && brakingData && (
-                <BrakingComparison 
-                  data={brakingData}
-                  driverName={driverNames[0]}
-                />
-              )}
+                {!loadingState && brakingData && (
+                  <BrakingComparison 
+                    data={brakingData}
+                    driverName={driverNames[0]}
+                  />
+                )}
 
-              {!loadingState && !brakingData && (
-                <div style={{ color: "#ccc" }}>
-                  No braking data available for this session/driver.
-                </div>
-              )}
-            </section>
-
-            {telemetryData && (
-              <section style={{ marginTop: 40 }}>
-                <h3 style={{ color: "white" }}>Throttle Input Comparison</h3>
-
-                <TelemetryLineChart
-                  data={telemetryData}
-                  metric="Throttle"
-                  label="Throttle (%)"
-                  
-                />
+                {!loadingState && !brakingData && (
+                  <div style={{ color: "#ccc" }}>
+                    No braking data available for this session/driver.
+                  </div>
+                )}
               </section>
-            )}
-          </>
+
+              {/* Throttle */}
+              {telemetryData && (
+                <section style={{ marginTop: 40, marginBottom: 40 }}>
+                  <h3 style={{ color: "white" }}>Throttle Input Comparison</h3>
+
+                  <TelemetryLineChart
+                    data={telemetryData}
+                    metric="Throttle"
+                    label="Throttle (%)"
+                  />
+                </section>
+              )}
+            </div>
+
+            {/* RIGHT — 40% */}
+            <div
+              id="braking-dist-container"
+              style={{
+                width: "40%",
+                minWidth: 0,
+                flex: "0 0 40%",
+                background: "rgb(25, 27, 31)",
+                padding: "10px",
+                borderRadius: "8px",
+                boxShadow: "0 0 10px rgba(0,0,0,0.4)",
+                height: "fit-content",
+                maxHeight: "900px",
+                overflow: "hidden",
+                display: "flex",
+                justifyContent: "center",
+              }}
+            >
+              <BrakingDistributionBoxPlot data={brakingDist} />
+            </div>
+
+          </div>
         )}
       </div>
     </div>

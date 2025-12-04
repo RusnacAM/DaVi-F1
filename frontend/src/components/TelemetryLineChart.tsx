@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TelemetryPoint, TelemetryResponse } from "../api/fetchTelemetry";
 import * as d3 from "d3";
 
@@ -14,6 +14,21 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
   label,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(1200);
+
+  // Update width when container resizes
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
 
   useEffect(() => {
     if (!data) return;
@@ -24,9 +39,8 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const width = 1200;
     const height = 300;
-    const margin = 40;
+    const margin = { top: 40, right: 40, bottom: 50, left: 60 };
 
     const allPoints = Object.entries(data).flatMap(([driver, points]) =>
       points.map((p) => ({
@@ -35,17 +49,18 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
       }))
     );
 
+    // Changed from 'd.distance' to 'd.time'
     const xExtent = d3.extent(allPoints, (d) => d.distance) as [number, number];
     const yExtent = d3.extent(allPoints, (d) => d[metric]) as [number, number];
 
     const xScale = d3
       .scaleLinear()
       .domain(xExtent)
-      .range([margin, width - margin]);
+      .range([margin.left, width - margin.right]);
     const yScale = d3
       .scaleLinear()
       .domain(yExtent)
-      .range([height - margin, margin]);
+      .range([height - margin.bottom, margin.top]);
 
     const colorScale = d3
       .scaleOrdinal<string>()
@@ -69,24 +84,29 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
 
     svg
       .append("g")
-      .attr("transform", `translate(0, ${height - margin})`)
+      .attr("transform", `translate(0, ${height - margin.bottom})`)
       .call(d3.axisBottom(xScale).ticks(10))
       .attr("color", "white");
 
     svg
       .append("g")
-      .attr("transform", `translate(${margin}, 0)`)
+      .attr("transform", `translate(${margin.left}, 0)`)
       .call(d3.axisLeft(yScale).ticks(5))
       .attr("color", "white");
 
     svg
       .append("text")
-      .attr("x", margin)
-      .attr("y", margin / 2)
+      .attr("x", width / 2)
+      .attr("y", margin.top / 2)
       .attr("fill", "white")
+      .attr("text-anchor", "middle")
       .style("font-size", "14px")
       .text("Distance along lap [m]");
-  }, [data, metric]);
+  }, [data, metric, width]);
 
-  return <svg ref={svgRef} width={1200} height={300}></svg>;
+  return (
+    <div ref={containerRef} style={{ width: "100%" }}>
+      <svg ref={svgRef} width={width} height={300}></svg>
+    </div>
+  );
 };

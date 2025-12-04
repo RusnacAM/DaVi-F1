@@ -151,3 +151,37 @@ def braking_comparison(session_year: int, session_name: str, identifier: str, dr
     })
 
     return df.to_dict(orient="records")
+
+@app.get("/api/v1/braking-distribution")
+def get_braking_distribution(
+    session_year: int,
+    session_name: str,
+    identifier: str,
+    drivers: List[str] = Query(None)
+):
+    session = get_loaded_session(session_year, session_name, identifier)
+
+    # Use only real laps (like your experiment)
+    laps = session.laps.pick_accurate().pick_not_deleted().pick_wo_box()
+
+    output = []
+
+    for driver in drivers:
+        driver_laps = laps.pick_drivers(driver)
+
+        for _, lap in driver_laps.iterrows():
+            try:
+                car = lap.get_car_data().add_distance().copy()
+                car["Brake"] = car["Brake"].astype(float)
+                car["dDist"] = car["Distance"].diff().fillna(0)
+                braking_distance = car.loc[car["Brake"] > 0.5, "dDist"].sum()
+
+                output.append({
+                    "driver": driver,
+                    "lap": int(lap["LapNumber"]),
+                    "braking_distance": float(braking_distance)
+                })
+            except Exception:
+                continue
+
+    return {"data": output}

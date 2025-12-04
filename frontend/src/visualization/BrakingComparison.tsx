@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import * as d3 from "d3";
 import type { BrakingPoint } from "../api/fetchBrakingComparison";
 
@@ -8,20 +8,34 @@ type Props = {
 };
 
 export const BrakingComparison: React.FC<Props> = ({ data, driverName }) => {
-  const ref = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(1200);
+
+  // Update width when container resizes
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
 
   useEffect(() => {
-    if (!data || data.length === 0) return;
-    // basic dimensions
-    const container = ref.current!;
-    const width = 1200;
+    if (!data || data.length === 0 || !containerRef.current) return;
+    
+    const container = containerRef.current;
     const height = 360;
-    const margin = { top: 20, right: 40, bottom: 20, left: 40 };
+    const margin = { top: 20, right: 40, bottom: 50, left: 60 };
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
     // clear previous svg
     d3.select(container).selectAll("svg").remove();
+    d3.select(container).selectAll("div").remove();
 
     const svg = d3
       .select(container)
@@ -98,8 +112,7 @@ export const BrakingComparison: React.FC<Props> = ({ data, driverName }) => {
 
     // legend
     const legend = svg.append("g").attr("transform", `translate(${margin.left + 10},${10})`);
-    legend.append("rect").attr("width", 400).attr("height", 36).attr("fill", "transparent");
-
+    
     legend.append("circle").attr("cx", 6).attr("cy", 6).attr("r", 6).attr("fill", color("ideal"));
     legend.append("text").attr("x", 18).attr("y", 10).text("Ideal Lap (fastest overall)").attr("font-size", 12).attr("fill", "white");
 
@@ -144,13 +157,7 @@ export const BrakingComparison: React.FC<Props> = ({ data, driverName }) => {
     }).on("mouseleave", function () {
       tooltip.style("display", "none");
     });
+  }, [data, driverName, width]);
 
-    // cleanup on unmount
-    return () => {
-      d3.select(container).selectAll("svg").remove();
-      d3.select(container).selectAll("div").remove();
-    };
-  }, [data, driverName]);
-
-  return <div ref={ref} style={{ width: "100%", maxWidth: "100%", marginTop: 12 }} />;
+  return <div ref={containerRef} style={{ width: "100%", position: "relative" }} />;
 };
