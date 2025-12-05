@@ -71,54 +71,64 @@ def get_gear_data(session_year: int, session_name: str, identifier: str, driver:
     
     return data.to_dict(orient="records")
 
-@app.get("/api/v1/track-dominance")
-def get_track_dominance(session_name: str, session_year: int, identifier: str,  drivers: List[str] = Query(None)):
-    session = get_loaded_session(session_year, session_name, identifier)
 
-    # Collect telemetry for all drivers
+@app.get("/api/v1/track-dominance")
+def get_track_dominance(session_name: str, identifier: str, drivers: list[str] = Query(None),
+                                  session_years: list[int] = Query(None)):   
     telemetry_list = []
 
-    for i, driver in enumerate(drivers):
-        fastest_lap = session.laps.pick_drivers(driver).pick_fastest()
-        telemetry = fastest_lap.get_telemetry().add_distance()
-        telemetry['Driver'] = driver
-        telemetry_list.append(telemetry)
+    for year in session_years:
+        session_event = get_loaded_session(year, session_name, identifier)
 
-    # Combine all driver telemetry into one DataFrame
-    telemetry_drivers = pd.concat(telemetry_list)
+        for driver in drivers:
+            lap = session_event.laps.pick_drivers(driver).pick_fastest()
+            telemetry = lap.get_telemetry().add_distance()
 
-    # Define minisectors
+            telemetry["Driver"] = driver
+            telemetry["Year"] = year
+            telemetry["DriverYear"] = f"{driver}_{year}"
+
+            telemetry_list.append(telemetry)
+
+    # Combine into one dataframe
+    telemetry_all = pd.concat(telemetry_list, ignore_index=True)
+
     if session_name in sector_dict.keys():
         sector_bounds = sector_dict[session_name]
-
     else:
         num_minisectors = 12
         sector_bounds = [0] * (num_minisectors + 1)
-        total_dist = telemetry_drivers['Distance'].max()
+        total_dist = telemetry_all['Distance'].max()
 
-        for i in range(1,num_minisectors+1):
-            sector_bounds[i] = math.ceil((i) * (total_dist/num_minisectors))
+        for i in range(1, num_minisectors + 1):
+            sector_bounds[i] = math.ceil(i * (total_dist / num_minisectors))
 
-    
-    # Create minisector mapping
-    telemetry_drivers['Minisector'] = np.digitize(
-        telemetry_drivers['Distance'],
-        bins=sector_bounds,
-        right=False
+    telemetry_all['Minisector'] = np.digitize(
+        telemetry_all['Distance'], bins=sector_bounds, right=False
     )
 
-    average_speed = telemetry_drivers.groupby(['Minisector', 'Driver'])['Speed'].mean().reset_index()
-    fastest_driver = average_speed.loc[average_speed.groupby(['Minisector'])['Speed'].idxmax()]
+    avg_speed = (
+        telemetry_all
+        .groupby(['Minisector', 'DriverYear'])['Speed']
+        .mean()
+        .reset_index()
+    )
 
-    fastest_driver = fastest_driver[['Minisector', 'Driver']].rename(columns={'Driver': 'Fastest_driver'})
-    telemetry_drivers = telemetry_drivers.merge(fastest_driver, on=['Minisector'])
-    telemetry_drivers = telemetry_drivers.sort_values(by=['Distance'])
-    
-    data = pd.DataFrame({
-      "x": telemetry_drivers["X"],
-      "y": telemetry_drivers["Y"],
-      "minisector": telemetry_drivers["Minisector"],
-      "fastest_driver": telemetry_drivers["Fastest_driver"]
+    fastest = avg_speed.loc[
+        avg_speed.groupby('Minisector')['Speed'].idxmax()
+    ][['Minisector', 'DriverYear']].rename(columns={'DriverYear': 'Fastest'})
+
+    telemetry_all = telemetry_all.merge(fastest, on='Minisector')
+
+    telemetry_all = telemetry_all.sort_values(by=['Distance'])
+
+    result = pd.DataFrame({
+        "x": telemetry_all["X"],
+        "y": telemetry_all["Y"],
+        "minisector": telemetry_all["Minisector"],
+        "fastest_driver": telemetry_all["Driver"]
+        #"driver": telemetry_all["Fastest"],
+        #"year": telemetry_all["Year"]
     })
-    
-    return data.to_dict(orient="records")
+
+    return result.to_dict(orient="records")

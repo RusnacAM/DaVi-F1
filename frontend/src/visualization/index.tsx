@@ -24,7 +24,7 @@ export const Visualization = () => {
     try {
       setLoadingState(true);
       const response = await fetchTrackDominance(
-        sessionYears[0],
+        sessionYears,
         sessionName,
         sessionIdentifiers[0],
         driverNames
@@ -56,12 +56,21 @@ export const Visualization = () => {
       .attr("transform", "translate(50, 0)");
 
     //  --- Track ---
+    if (data && data.length > 0) {
+      console.log("Track Dominance Data:", data);
+    }
+    else {
+      console.log("No data available for Track Dominance visualization.");
+    }
     const width = 500;
     const height = 500;
     const margin = 10;
 
     const xExtent = d3.extent(data, (d) => d.x) as [number, number];
     const yExtent = d3.extent(data, (d) => d.y) as [number, number];
+
+    console.log("X Extent:", xExtent);
+    console.log("Y Extent:", yExtent);
 
     const xScale = d3
       .scaleLinear()
