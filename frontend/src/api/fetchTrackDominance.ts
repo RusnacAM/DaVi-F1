@@ -5,7 +5,7 @@ export interface TrackDominancePoint {
   x: number;
   y: number;
   minisector: number;
-  fastest_driver: string;
+  fastest: string;
   driver: string;
   year: number;
 }
