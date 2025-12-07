@@ -124,9 +124,9 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: List[str] 
         "x": telemetry_all["X"],
         "y": telemetry_all["Y"],
         "minisector": telemetry_all["Minisector"],
-        "fastest_driver": telemetry_all["Driver"],
-        #"driver": telemetry_all["Driver"],
-        #"year": telemetry_all["Year"]
+        "fastest": telemetry_all["Fastest"],
+        "driver": telemetry_all["Driver"],
+        "year": telemetry_all["Year"]
     })
 
     return result.to_dict(orient="records")
