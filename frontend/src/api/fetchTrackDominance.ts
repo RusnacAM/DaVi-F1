@@ -6,16 +6,19 @@ export interface TrackDominancePoint {
   y: number;
   minisector: number;
   fastest_driver: string;
+  driver: string;
+  year: number;
 }
 
 export type TrackDominanceResponse = TrackDominancePoint[]
 
-export const fetchTrackDominance = async (sessionYear:string, sessionName: string, identifier: string, drivers: string[]): Promise<TrackDominanceResponse> => {
+export const fetchTrackDominance = async (sessionName: string, identifier: string, drivers: string[], sessionYears: string[] ): Promise<TrackDominanceResponse> => {
   const driverCodes = drivers.map(d => driverCode[d]);
-  var driversParam = ""
-  driverCodes.forEach(driverCode => driversParam += `&drivers=${driverCode}`)
+  let driversParam = "";
+  driverCodes.forEach(driverCode => driversParam += `&drivers=${driverCode}`);
 
-  console.log(driversParam)
+  let yearsParam = "";
+  sessionYears.forEach(year => yearsParam += `&session_years=${year}`)
 
-  return await apiRequest<TrackDominanceResponse>(`/track-dominance?&session_year=${sessionYear}&session_name=${sessionName}&identifier=${identifier}&${driversParam}`, 'GET')
+  return await apiRequest<TrackDominanceResponse>(`/track-dominance?session_name=${sessionName}&identifier=${identifier}${driversParam}${yearsParam}`, 'GET')
 };

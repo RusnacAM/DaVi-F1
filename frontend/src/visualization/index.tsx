@@ -24,10 +24,10 @@ export const Visualization = () => {
     try {
       setLoadingState(true);
       const response = await fetchTrackDominance(
-        sessionYears[0],
         sessionName,
         sessionIdentifiers[0],
-        driverNames
+        driverNames,
+        sessionYears
       );
       setData(response);
     } catch (error) {
@@ -79,37 +79,29 @@ export const Visualization = () => {
       .range(d3.schemeDark2);
 
     const startPoint = data[0];
+
+    // --- GROUP BY MINISECTOR ---
     const sectors = d3.group(data, (d) => d.minisector);
+
+    // --- GET UNIQUE FASTEST DRIVER-YEAR STRINGS ---
+    const fastestList = Array.from(new Set(data.map((d) => d.fastest_driver)));
 
     const line = d3
       .line<TrackDominancePoint>()
       .x((d) => xScale(d.x))
-      .y((d) => yScale(d.y));
+      .y((d) => yScale(d.y))
+      .curve(d3.curveLinear);
 
     for (const [, points] of sectors) {
-      trackGroup
+      const fastest = points[0].fastest_driver; // all points share same fastest driver
+
+      svg
         .append("path")
         .datum(points)
         .attr("fill", "none")
-        .attr("stroke", colorScale(points[0].fastest_driver)!)
-        .attr("stroke-width", 8)
+        .attr("stroke", colorScale(fastest)!)
+        .attr("stroke-width", 6)
         .attr("d", line);
-
-      const midIndex = Math.floor(points.length / 2);
-      const midPoint = points[midIndex];
-
-      trackGroup
-        .append("text")
-        .attr("x", xScale(midPoint.x))
-        .attr("y", yScale(midPoint.y))
-        .attr("text-anchor", "middle")
-        .attr("alignment-baseline", "middle")
-        .attr("font-size", 10)
-        .attr("fill", "white")
-        .attr("stroke", "black")
-        .attr("stroke-width", 0.5)
-        .attr("paint-order", "stroke")
-        .text(midPoint.minisector);
     }
 
     if (startPoint) {
