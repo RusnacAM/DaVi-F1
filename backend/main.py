@@ -73,10 +73,9 @@ def get_gear_data(session_year: int, session_name: str, identifier: str, driver:
 
 
 @app.get("/api/v1/track-dominance")
-def get_track_dominance(session_name: str, identifier: str, drivers: list[str] = Query(None),
-                                  session_years: list[int] = Query(None)):   
+def get_track_dominance(session_name: str, identifier: str,  drivers: List[str] = Query(None), session_years: List[int] = Query(None)):
     telemetry_list = []
-
+    
     for year in session_years:
         session_event = get_loaded_session(year, session_name, identifier)
 
@@ -90,7 +89,6 @@ def get_track_dominance(session_name: str, identifier: str, drivers: list[str] =
 
             telemetry_list.append(telemetry)
 
-    # Combine into one dataframe
     telemetry_all = pd.concat(telemetry_list, ignore_index=True)
 
     if session_name in sector_dict.keys():
@@ -126,8 +124,8 @@ def get_track_dominance(session_name: str, identifier: str, drivers: list[str] =
         "x": telemetry_all["X"],
         "y": telemetry_all["Y"],
         "minisector": telemetry_all["Minisector"],
-        "fastest_driver": telemetry_all["Driver"]
-        #"driver": telemetry_all["Fastest"],
+        "fastest_driver": telemetry_all["Driver"],
+        #"driver": telemetry_all["Driver"],
         #"year": telemetry_all["Year"]
     })
 
