@@ -131,6 +131,9 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
         fastest, on='Minisector', how='left'
     )
 
+    result_telemetry["Driver"] = result_telemetry["Fastest"].apply(lambda x: x.split('_')[0])
+    result_telemetry["Year"] = result_telemetry["Fastest"].apply(lambda x: int(x.split('_')[1]))
+
     result = pd.DataFrame({
         "x": result_telemetry["X"],
         "y": result_telemetry["Y"],
@@ -143,7 +146,7 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
     return result.to_dict(orient="records")
 
 
-@app.get("/api/v1/Avg-Diffs")
+@app.get("/api/v1/AvgDiffs")
 def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
     telemetry_list = []
     
@@ -185,8 +188,6 @@ def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: li
 
             telemetry_list.append(telemetry)
 
-
-    print(fastest_driver_overall, fastest_year_overall)
     # Concatenate all telemetry data
     telemetry_all = pd.concat(telemetry_list, ignore_index=True)
 
@@ -207,6 +208,7 @@ def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: li
         telemetry_all['Distance'], bins=sector_bounds, right=False
     )
 
+
     # Get sector lengths
     sector_lengths = []
     for i in range(1, len(sector_bounds)):
@@ -215,6 +217,8 @@ def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: li
         'Minisector': list(range(1, len(sector_bounds))),
         'SectorLength': sector_lengths
     })
+
+    print(sector_length_df)
 
     ### ---- Calculate average time and time loss to fastest driver per minisector ---- ### 
 
@@ -225,6 +229,8 @@ def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: li
         .mean()
         .reset_index()
     )
+
+    #print(avg_speed)
 
     # Add sector labels
     labels = label_dict.get(session_name, {})

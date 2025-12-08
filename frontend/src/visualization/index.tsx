@@ -6,17 +6,22 @@ import {
   fetchTrackDominance,
   type TrackDominanceResponse,
 } from "../api/fetchTrackDominance";
-import areaChart from "../../public/images/area_chart.jpeg";
-import barChart from "../../public/images/bar_chart.jpeg";
-import { CircularProgress } from "@mui/material";
 import { TrackDominance } from "./TrackDominance";
-import { AvgDiffsChart } from "../visualization/AvgDiffs.tsx";
+import {
+  fetchAvgDiffs,
+  type AvgDiffsResponse,
+} from "../api/fetchAvgDiffs";
+import { AvgDiffsChart } from "./AvgDiffs";
+
+import { CircularProgress } from "@mui/material";
+
 
 export const Visualization = () => {
   const { sessionYears, sessionName, sessionIdentifier, driverNames } =
     useFilterConfigs();
 
   const [data, setData] = useState<TrackDominanceResponse>([]);
+  const [AvgDiffsData, setDataAvgDiffs] = useState<AvgDiffsResponse>([]);
   const [loadingState, setLoadingState] = useState(false);
 
   const fetchData = async () => {
@@ -29,6 +34,14 @@ export const Visualization = () => {
         sessionYears
       );
       setData(response);
+
+      const responseAvgDiffs = await fetchAvgDiffs(
+        sessionName,
+        sessionIdentifier,
+        driverNames,
+        sessionYears
+      );
+      setDataAvgDiffs(responseAvgDiffs);
     } catch (error) {
       setLoadingState(false);
       console.error("Error fetching data:", error);
@@ -59,11 +72,18 @@ export const Visualization = () => {
             <CircularProgress size={50} color="primary" />
           )}
         </div>
-        <div className="supporting-chart">
-          <img src={areaChart} alt="Logo" width={700} height={300} />
-          <img src={barChart} alt="Logo" width={700} height={300} />
+      <div className = "chart-container-avgdiffs">
+          <div className ="AvgDiffs-Chart">
+          {AvgDiffsData && !loadingState ? (
+            <AvgDiffsChart
+              data={AvgDiffsData}
+            />
+          ) : (
+            <CircularProgress size={50} color="primary" />
+          )}
+        </div>
         </div>
       </div>
-    </>
+      </>
   );
 };

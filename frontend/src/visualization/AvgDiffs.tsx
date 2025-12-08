@@ -1,8 +1,6 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import {
-  type AvgDiffsPoint,
-} from "../api/fetchAvgDiffs";
+import { type AvgDiffsPoint } from "../api/fetchAvgDiffs";
 
 
 // Set Visualization Dimensions and Margins
@@ -12,8 +10,8 @@ const MARGIN = { top: 50, right: 100, bottom: 50, left: 70 }; // Increased Right
 const INNER_W = WIDTH - MARGIN.left - MARGIN.right;
 const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom;
 
-// Set colors - removed later
-const COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b", "#e377c2"];
+// Set colorscheme
+const COLORS = d3.schemeTableau10;
 
 export interface AvgDiffsChartProps {
   data: AvgDiffsPoint[];
@@ -28,219 +26,262 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data }) => {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    // Random dimensions
-    const width = 1000;
-    const height = 560;
-    const margin = { top: 44, right: 200, bottom: 78, left: 72 };
-    const innerW = width - margin.left - margin.right;
-    const innerH = height - margin.top - margin.bottom;
+    // remove any leftover tooltip from previous renders and create a tiny tooltip
+    d3.select(svgRef.current?.parentElement).selectAll(".avgdiffs-tooltip").remove();
+    const tooltip = d3
+      .select(svgRef.current?.parentElement)
+      .append("div")
+      .attr("class", "avgdiffs-tooltip")
+      .style("position", "absolute")
+      .style("pointer-events", "none")
+      .style("background", "rgba(0,0,0,0.78)")
+      .style("color", "#fff")
+      .style("padding", "4px 6px")
+      .style("font-size", "11px")
+      .style("line-height", "1.1")
+      .style("border-radius", "4px")
+      .style("opacity", "0")
+      .style("z-index", "1000");
 
-    // --- Data Processing ---
-    const sectorTypes = ["slow", "medium", "fast", "straight"];
-    const driverYears = Array.from(new Set(data.map((d) => d.DriverYear)));
-    const drivers = Array.from(new Set(data.map((d) => d.DriverYear.split("_")[0])));
-    const years = Array.from(new Set(data.map((d) => d.DriverYear.split("_")[1])));
+    const g = svg
+      .append("g")
+      .attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
 
-    const grouped = sectorTypes.map((sector) => {
+    // --- 1. Data Preparation & Filtering ---
+    const sectors = ["Slow", "Medium", "Fast", "Straight"];
+    const allDriverYears = Array.from(new Set(data.map((d) => d.DriverYear)));
+
+    // A. Identify the Fastest Overall (Baseline) to remove
+    // We sum up the time diffs for each DriverYear. The one with the lowest sum is the fastest.
+    const sums = allDriverYears.map((dy) => {
+      const totalDiff = data
+        .filter((d) => d.DriverYear === dy)
+        .reduce((sum, curr) => sum + curr.Diff_to_Fastest_sec, 0);
+      return { dy, totalDiff };
+    });
+    
+    // Sort ascending (lowest diff first) and pick the first one
+    const fastestEntry = sums.sort((a, b) => a.totalDiff - b.totalDiff)[0];
+    const fastestDriverYear = fastestEntry ? fastestEntry.dy : "";
+
+    // B. Create the Filtered List (Exclude the fastest)
+    const activeDriverYears = allDriverYears
+      .filter((dy) => dy !== fastestDriverYear)
+      .sort();
+
+    // C. Extract Drivers and Years from the FILTERED list
+    const activeDrivers = Array.from(new Set(activeDriverYears.map((dy) => dy.split("_")[0]))).sort();
+    //const activeYears = Array.from(new Set(activeDriverYears.map((dy) => dy.split("_")[1]))).sort();
+
+    // D. Group Data
+    const groupedData = sectors.map((sector) => {
       const row: any = { sector };
-      driverYears.forEach((dy) => {
+      activeDriverYears.forEach((dy) => {
+        // Case-insensitive check for label
         const found = data.find(
-          (r) => r.DriverYear === dy && r.MinisectorLabel === sector
+          (d) => 
+            d.DriverYear === dy && 
+            d.MinisectorLabel.toLowerCase() === sector.toLowerCase()
         );
-        row[dy] = found ? found.Diff_to_Fastest_sec : 0;
+        row[dy] = found ? Number(found.Diff_to_Fastest_sec) : 0;
       });
       return row;
     });
 
-    // --- Scales ---
-    const x0 = d3
-      .scaleBand()
-      .domain(sectorTypes)
-      .range([0, innerW])
-      .padding(0.25);
+    // --- 2. Scales ---
+    const x0 = d3.scaleBand().domain(sectors).range([0, INNER_W]).padding(0.2);
 
+    // x1 Domain is strictly the active (filtered) list. 
+    // This ensures bars are centered within the x0 band.
     const x1 = d3
       .scaleBand()
-      .domain(driverYears)
+      .domain(activeDriverYears)
       .range([0, x0.bandwidth()])
-      .padding(0.05);
+      .padding(0.1);
 
-    const yMin = Math.min(0, d3.min(data, (d) => d.Diff_to_Fastest_sec) || 0);
-    const yMax = Math.max(0, d3.max(data, (d) => d.Diff_to_Fastest_sec) || 0);
+    // compute min/max from the actual plotted values so negatives are handled
+    const allValues: number[] = groupedData.flatMap((row) =>
+      activeDriverYears.map((dy) => Number(row[dy] ?? 0))
+    );
+    let yMin = d3.min(allValues) ?? 0;
+    let yMax = d3.max(allValues) ?? 0;
+    // ensure zero is included so baseline is visible
+    if (yMin > 0) yMin = 0;
+    if (yMax < 0) yMax = 0;
 
-    const y = d3.scaleLinear().domain([yMin, yMax]).nice().range([innerH, 0]);
+    const y = d3.scaleLinear().domain([yMin, yMax]).nice().range([INNER_H, 0]);
 
-    const driverColor = d3
-      .scaleOrdinal<string>()
-      .domain(drivers)
-      .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b"]);
+    const colorScale = d3.scaleOrdinal<string>().domain(activeDrivers).range(COLORS);
+    
+    // Map each driver to its sorted list of years (strings)
+    const yearsByDriver: Record<string, string[]> = Object.fromEntries(
+      activeDrivers.map((drv) => {
+        const yrs = activeDriverYears
+          .filter((dy) => dy.startsWith(drv + "_"))
+          .map((dy) => dy.split("_")[1])
+          .sort();
+        return [drv, yrs];
+      })
+    );
+    
+    // determine baseline Y (clamped to chart area)
+    const baselineY = Math.max(0, Math.min(INNER_H, y(0)));
 
-    // --- Defs & Patterns ---
-    const defs = svg.append("defs");
-
-    const addPattern = (id: string, color: string, year: string, isLegend = false) => {
-      const size = isLegend ? 10 : 8;
-      const pat = defs
-        .append("pattern")
-        .attr("id", id)
-        .attr("patternUnits", "userSpaceOnUse")
-        .attr("width", size)
-        .attr("height", size);
-
-      // Background
-      pat
-        .append("rect")
-        .attr("width", size)
-        .attr("height", size)
-        .attr("fill", color);
-
-      // Overlay Texture
-      if (Number(year) < 2022) {
-        pat
-          .append("path")
-          .attr("d", `M0 ${size} L${size} 0`)
-          .attr("stroke", isLegend ? "white" : "rgba(255,255,255,0.85)")
-          .attr("stroke-width", 1.5);
-        pat
-          .append("path")
-          .attr("d", `M-2 ${size + 2} L${size + 2} -2`)
-          .attr("stroke", isLegend ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.45)")
-          .attr("stroke-width", 1.5);
-      } else {
-        pat
-          .append("circle")
-          .attr("cx", size / 2)
-          .attr("cy", size / 2)
-          .attr("r", isLegend ? 1.8 : 1.2)
-          .attr("fill", isLegend ? "white" : "rgba(255,255,255,0.85)");
-      }
-    };
-
-    // Generate patterns for data
-    driverYears.forEach((dy) => {
-      const [drv, yr] = dy.split("_");
-      addPattern(`pat_${drv}_${yr}`, driverColor(drv), yr);
-    });
-
-    // Generate patterns for legend (neutral gray)
-    years.forEach((yr) => {
-      addPattern(`pat_legend_${yr}`, "#dcdcdc", yr, true);
-    });
-
-    // --- Drawing ---
-    const g = svg
-      .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
-
-    // Sectors
-    const sectors = g
-      .selectAll("g.sector")
-      .data(grouped)
+    // --- 3. Drawing Bars ---
+    const sectorGroup = g
+      .selectAll(".sector-group")
+      .data(groupedData)
       .enter()
       .append("g")
-      .attr("class", "sector")
-      .attr("transform", (d: any) => `translate(${x0(d.sector)},0)`);
+      .attr("transform", (d) => `translate(${x0(d.sector)},0)`);
 
-    // Bars
-    sectors
+    sectorGroup
       .selectAll("rect")
-      .data((d: any) => driverYears.map((dy) => ({ key: dy, value: d[dy] })))
+      .data((d) => activeDriverYears.map((dy) => ({ key: dy, value: d[dy] })))
       .enter()
       .append("rect")
       .attr("x", (d) => x1(d.key)!)
+      // position & height relative to baseline so negative values go below x-axis
+      .attr("y", (d) => Math.min(y(d.value), baselineY))
       .attr("width", x1.bandwidth())
-      .attr("y", (d) => (d.value >= 0 ? y(d.value) : y(0)))
-      .attr("height", (d) => Math.abs(y(d.value) - y(0)))
+      .attr("height", (d) => Math.abs(y(d.value) - baselineY))
       .attr("fill", (d) => {
         const [drv, yr] = d.key.split("_");
-        return `url(#pat_${drv}_${yr})`;
+        // base color per driver from the categorical scale
+        const baseColor = colorScale(drv) as string;
+
+        // convert to HSL and vary saturation & lightness by year index
+        const h = d3.hsl(baseColor);
+        const years = yearsByDriver[drv] ?? [yr];
+        const idx = Math.max(0, years.indexOf(yr));
+        const t = years.length > 1 ? idx / (years.length - 1) : 0.5; // 0..1 across years
+        // saturation: from 0.6 -> 1.0, lightness: from 0.35 -> 0.7 (t controls interpolation)
+        h.s = Math.max(0, Math.min(1, 0.8 + 0.2 * t));
+        h.l = Math.max(0, Math.min(1, 0.5 + 0.2 * t));
+        return h.toString();
+       })
+
+
+      // tiny tooltip interactions
+      .on("mouseenter", function (event: any, d: any) {
+        const [drv, yr] = d.key.split("_");
+        tooltip
+          .html(
+            `<div style="font-weight:600;margin-bottom:2px">${drv} ${yr}</div><div style="font-size:11px">${Number(
+              d.value
+            ).toFixed(3)} s</div>`
+          )
+          .style("opacity", "1");
       })
+      .on("mousemove", function (event: any) {
+        // position tooltip next to cursor with slight offset
+        tooltip
+          .style("left", event.pageX + 10 + "px")
+          .style("top", event.pageY + 8 + "px");
+      })
+      .on("mouseleave", function () {
+        tooltip.style("opacity", "0");
+      })
+      // Removed variable opacity: always full opacity
+      .attr("fill-opacity", 1)
       .attr("stroke", "none");
 
-    // --- Axes ---
+    // --- 4. Axes & Labels ---
+    // X Axis
     g.append("g")
-      .attr("transform", `translate(0,${y(0)})`)
-      .call(d3.axisBottom(x0));
+      .attr("transform", `translate(0,${baselineY})`)
+      .call(d3.axisBottom(x0))
+      .selectAll("text")
+      // shift tick labels further away from the axis when there are negative values
+      .attr("dy", yMin < 0 ? "4em" : "1em")
+      .style("font-size", "14px")
+      .style("font-weight", "600")
+      .style("text-transform", "capitalize") // Capitalize sector names
+      .style("fill", "#fff"); // labels white
 
-    g.append("g").call(d3.axisLeft(y).ticks(6));
+    // Y Axis
+    g.append("g")
+      .call(d3.axisLeft(y))
+      .selectAll("text")
+      .style("font-size", "12px")
+      .style("fill", "#fff"); // labels white
 
-    // Labels
-    g.append("text")
-      .attr("x", innerW / 2)
-      .attr("y", innerH + 48)
-      .attr("text-anchor", "middle")
-      .attr("font-size", 12)
-      .attr("font-weight", 600)
-      .text("Sector Type");
-
+    // Y Label
     g.append("text")
       .attr("transform", "rotate(-90)")
-      .attr("x", -innerH / 2)
-      .attr("y", -52)
+      .attr("y", -50)
+      .attr("x", -INNER_H / 2)
       .attr("text-anchor", "middle")
-      .attr("font-size", 12)
-      .attr("font-weight", 600)
-      .text("Average time loss [s]");
+      .style("font-weight", "bold")
+      .style("fill", "#fff")
+      .text("Time loss (s)");
 
-    // --- Legend ---
-    const legendX = width - margin.right + 20;
+    // --- 5. Legends ---
     const legend = svg
       .append("g")
-      .attr("transform", `translate(${legendX},${margin.top})`);
+      .attr("transform", `translate(${INNER_W + 20}, ${MARGIN.top})`);
 
-    // Driver Colors
-    legend
-      .append("text")
-      .text("Driver (color)")
-      .attr("font-weight", "700")
-      .attr("font-size", 12);
-
-    drivers.forEach((drv, i) => {
-      const y0 = 14 + i * 26;
-      legend
-        .append("rect")
-        .attr("x", 0)
-        .attr("y", y0)
-        .attr("width", 18)
-        .attr("height", 18)
-        .attr("fill", driverColor(drv));
-      legend
-        .append("text")
-        .attr("x", 26)
-        .attr("y", y0 + 13)
-        .text(drv)
-        .attr("font-size", 13);
+    // -> Driver Legend (Colors)
+    legend.append("text").text("Drivers").style("font-weight", "bold").style("fill", "#fff");
+    
+    activeDrivers.forEach((drv, i) => {
+      const yPos = 25 + i * 20;
+      legend.append("rect")
+        .attr("y", yPos).attr("width", 15).attr("height", 15)
+        .attr("fill", colorScale(drv));
+      legend.append("text")
+        .attr("x", 20).attr("y", yPos + 12)
+        .text(drv).style("font-size", "12px").style("fill", "#fff");
     });
 
-    // Year Textures
-    const yearLabelY = 14 + drivers.length * 26 + 8;
-    legend
-      .append("text")
-      .attr("x", 0)
-      .attr("y", yearLabelY)
-      .text("Year (texture)")
-      .attr("font-weight", "700")
-      .attr("font-size", 12);
+    /* -> Year Legend (no opacity encoding anymore)
+    if (activeYears.length > 0) {
+        const yearStart = 25 + activeDrivers.length * 20 + 20;
+        legend.append("text")
+            .attr("y", yearStart)
+            .text("Years")
+            .style("font-weight", "bold")
+            .style("fill", "#fff");
 
-    years.forEach((yr, i) => {
-      const y0 = yearLabelY + 26 + i * 26;
-      legend
-        .append("rect")
-        .attr("x", 0)
-        .attr("y", y0)
-        .attr("width", 18)
-        .attr("height", 18)
-        .attr("fill", `url(#pat_legend_${yr})`)
-        .attr("stroke", "#666");
-      legend
-        .append("text")
-        .attr("x", 26)
-        .attr("y", y0 + 13)
-        .text(yr)
-        .attr("font-size", 13);
-    });
+        activeYears.forEach((yr, i) => {
+            const yPos = yearStart + 25 + i * 20;
+            
+            // Draw a neutral gray box (full opacity)
+            legend.append("rect")
+                .attr("y", yPos).attr("width", 15).attr("height", 15)
+                .attr("fill", "#666")
+                .attr("fill-opacity", 1);
+                
+            legend.append("text")
+                .attr("x", 20).attr("y", yPos + 12)
+                .text(yr).style("font-size", "12px").style("fill", "#fff");
+        });
+    } */
+
+    // Title: centered at the top of the SVG, includes baseline info if available
+    const titleText = fastestDriverYear
+      ? `Average time loss to fastest driver: ${fastestDriverYear.split("_")[0]} (${fastestDriverYear.split("_")[1]})`
+      : "Avg Time Loss to Fastest";
+
+    svg.append("text")
+      .attr("x", MARGIN.left + INNER_W / 2)
+      .attr("y", MARGIN.top / 2)
+      .attr("text-anchor", "middle")
+      .style("font-size", "16px")
+      .style("font-weight", "600")
+      .style("fill", "#fff")
+      .text(titleText);
 
   }, [data]);
 
-  return <svg ref={svgRef} width={1000} height={560}></svg>;
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <svg 
+        ref={svgRef} 
+        width={WIDTH} 
+        height={HEIGHT} 
+        style={{ maxWidth: "100%", height: "auto" }}
+      ></svg>
+    </div>
+  );
 };

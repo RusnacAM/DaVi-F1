@@ -19,5 +19,5 @@ export const fetchAvgDiffs = async (sessionName: string, identifier: string, dri
   let yearsParam = "";
   sessionYears.forEach(year => yearsParam += `&session_years=${year}`)
 
-  return await apiRequest<AvgDiffsResponse>(`/AvgDiff?session_name=${sessionName}&identifier=${identifier}${driversParam}${yearsParam}`, 'GET')
+  return await apiRequest<AvgDiffsResponse>(`/AvgDiffs?session_name=${sessionName}&identifier=${identifier}${driversParam}${yearsParam}`, 'GET')
 };
