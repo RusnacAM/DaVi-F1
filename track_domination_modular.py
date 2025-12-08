@@ -24,11 +24,38 @@ def get_loaded_session(year, name, identifier):
 def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
     telemetry_list = []
     
+    # Track overall fastest lap across all loaded laps
+    lap = None
+    fastest_lap_time = None
+    fastest_driver_overall = None
+    fastest_year_overall = None
+
+    ### ---- Load telemetry data ---- ###
+
+    # Load all sessions and drivers' fastest laps
     for year in session_years:
         session_event = get_loaded_session(year, session_name, identifier)
 
         for driver in drivers:
             lap = session_event.laps.pick_drivers(driver).pick_fastest()
+
+            # skip if no lap found
+            if lap is None or getattr(lap, "empty", False):
+                continue
+
+            # Record overall fastest lap
+            if 'LapTime' in lap.index:
+                lap_time = lap['LapTime']
+            else:
+                # fallback attribute access if structure differs
+                lap_time = getattr(lap, 'LapTime', None)
+
+            if lap_time is not None and (fastest_lap_time is None or lap_time < fastest_lap_time):
+                lap = session_event.laps.pick_drivers(driver).pick_fastest()
+                fastest_lap_time = lap_time
+                fastest_driver_overall = driver
+                fastest_year_overall = year
+
             telemetry = lap.get_telemetry().add_distance()
 
             telemetry["Driver"] = driver
@@ -37,7 +64,12 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
 
             telemetry_list.append(telemetry)
 
+    # Concatenate all telemetry data
     telemetry_all = pd.concat(telemetry_list, ignore_index=True)
+
+    reference_telemetry = lap.get_telemetry().add_distance()
+    reference_telemetry["Driver"] = fastest_driver_overall
+    reference_telemetry["Year"] = fastest_year_overall
 
     if session_name in sector_dict.keys():
         sector_bounds = sector_dict[session_name]
@@ -60,80 +92,65 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
         .reset_index()
     )
 
-    #Find the fastest driver per minisector
-    fastest_per_min = avg_speed.groupby('Minisector')['Speed'].idxmax()
+    fastest = avg_speed.loc[
+        avg_speed.groupby('Minisector')['Speed'].idxmax()
+    ][['Minisector', 'DriverYear']].rename(columns={'DriverYear': 'Fastest'})
 
-    #Extract fastest speeds and drivers
-    fastest_s = avg_speed.loc[fastest_per_min][['Minisector', 'Speed']].rename(columns={'Speed': 'FastestSpeed'})
-    fastest_d = avg_speed.loc[fastest_per_min][['Minisector', 'DriverYear']].rename(columns={'DriverYear': 'Fastest'})
-
-    #Merge fastest_s in avg_speed on 'Minisector' to calculate speed loss
-    avg_speed = avg_speed.merge(fastest_s, on='Minisector')
-    avg_speed['SpeedGain'] = avg_speed['FastestSpeed'] - avg_speed['Speed']
-
-    #Find the average speed loss per minisector
-    avg_speed_gain = (
-        avg_speed
-        .groupby('Minisector')['SpeedGain']
-        .mean()
-        .reset_index()
+    #---- Merge fastest driver into average speed ---- #
+    avg_speed = avg_speed.merge(
+        fastest, on='Minisector', how='left'
     )
 
-    #Get sector lengths
-    sector_lengths = []
+    #Get the speed of the fastest overall driver as a new column, now NAs
+    avg_speed = avg_speed.merge(
+        avg_speed[avg_speed['DriverYear'] == f"{fastest_driver_overall}_{fastest_year_overall}"][['Minisector', 'Speed']].rename(columns={'Speed': 'FastestSpeed'}),
+        on='Minisector', how='left'
+    )
+
+    # Get time spend in sector
+    avg_speed['SectorLength'] = 0
     for i in range(1, len(sector_bounds)):
-        sector_lengths.append(sector_bounds[i] - sector_bounds[i-1])
-    sector_length_df = pd.DataFrame({
-        'Minisector': list(range(1, len(sector_bounds))),
-        'SectorLength': sector_lengths
-    })
+        length = sector_bounds[i] - sector_bounds[i-1]
+        avg_speed.loc[avg_speed['Minisector'] == i, 'SectorLength'] = length
 
-    #Merge sector lengths to avg_speed_loss
-    avg_speed_gain = avg_speed_gain.merge(sector_length_df, on='Minisector')
+    avg_speed['TimeInSector'] = (avg_speed['SectorLength'] / avg_speed['Speed'])  # time in seconds
+    avg_speed['FastestTimeInSector'] = (avg_speed['SectorLength'] / avg_speed['FastestSpeed'])  # time in seconds
+    avg_speed['TimeLossToFastest'] = avg_speed['TimeInSector'] - avg_speed['FastestTimeInSector']
 
-    #Find average time loss (in seconds) per minisector
-    avg_speed_gain['AvgTimeGain'] = (avg_speed_gain['SpeedGain'] * avg_speed_gain['SectorLength']) / 3600
+    print(avg_speed)
+    
+    reference_telemetry['Minisector'] = np.digitize(
+        reference_telemetry['Distance'], bins=sector_bounds, right=False
+    )
+    result_telemetry = reference_telemetry.merge(
+        fastest, on='Minisector', how='left'
+    )
 
-    telemetry_all = telemetry_all.merge(fastest_d, on='Minisector')
-    telemetry_all = telemetry_all.merge(avg_speed_gain[['Minisector', 'AvgTimeGain']], on='Minisector')
-    telemetry_all = telemetry_all.sort_values(by=['Distance'])
+    result_telemetry["Driver"] = result_telemetry["Fastest"].apply(lambda x: x.split('_')[0])
+    result_telemetry["Year"] = result_telemetry["Fastest"].apply(lambda x: int(x.split('_')[1]))
+    
+    #Merge avg_speed in results telemetry
+    result_telemetry = result_telemetry.merge(
+        avg_speed[['Minisector', 'DriverYear', 'TimeLossToFastest']],
+        left_on=['Minisector', result_telemetry["Fastest"]],
+        right_on=['Minisector', 'DriverYear'],
+        how='left')
 
     result = pd.DataFrame({
-        "x": telemetry_all["X"],
-        "y": telemetry_all["Y"],
-        "minisector": telemetry_all["Minisector"],
-        "fastest_driver": telemetry_all["Fastest"],
-        "TimeGain": round(telemetry_all["AvgTimeGain"],2)
+        "x": result_telemetry["X"],
+        "y": result_telemetry["Y"],
+        "minisector": result_telemetry["Minisector"],
+        "fastest": result_telemetry["Fastest"],
+        "driver": result_telemetry["Driver"],
+        "year": result_telemetry["Year"],
+        "lossToFastest": round(result_telemetry["TimeLossToFastest"],2)
     })
 
     return result.to_dict(orient="records")
 
+
+
 drivers = ["VER","LEC","HAM"]
 D = get_track_dominance(session_name = "Hungarian Grand Prix", identifier = "Q", drivers=drivers, session_years = [2021,2022])
 print(D)
-
-"""
-#Visualize the result (for testing purposes)
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-import matplotlib.colors as mcolors
-
-x = [point['x'] for point in D]
-y = [point['y'] for point in D]
-fastest_driver = [point['fastest_driver'] for point in D]
-unique_drivers = list(set(fastest_driver))
-
-colors = plt.cm.get_cmap('tab10', len(unique_drivers))
-driver_color_map = {driver: colors(i) for i, driver in enumerate(unique_drivers)}
-driver_colors = [driver_color_map[driver] for driver in fastest_driver]
-plt.figure(figsize=(10, 6))
-plt.scatter(x, y, c=driver_colors, s=1)
-plt.title('Track Domination Visualization')
-plt.xlabel('X Coordinate')
-plt.ylabel('Y Coordinate')
-legend_elements = [Line2D([0], [0], marker='o', color='w', label=driver,
-                          markerfacecolor=driver_color_map[driver], markersize=10) for driver in unique_drivers]
-plt.legend(handles=legend_elements, title='Fastest Driver', bbox_to_anchor=(1.05, 1), loc='upper left')
-plt.tight_layout()
-plt.show()
-"""
+print(len(D))
