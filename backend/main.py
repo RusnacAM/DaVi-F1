@@ -179,11 +179,8 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
         fastest, on='Minisector', how='left'
     )
 
-    #Get the speed of the fastest overall driver as a new column, now NAs
-    avg_speed = avg_speed.merge(
-        avg_speed[avg_speed['DriverYear'] == f"{fastest_driver_overall}_{fastest_year_overall}"][['Minisector', 'Speed']].rename(columns={'Speed': 'FastestSpeed'}),
-        on='Minisector', how='left'
-    )
+    # Get the fastest speed per minisector
+    avg_speed['FastestSpeed'] = avg_speed.groupby('Minisector')['Speed'].transform('max')
 
     # Get time spend in sector
     avg_speed['SectorLength'] = 0
@@ -193,9 +190,13 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
 
     avg_speed['TimeInSector'] = (avg_speed['SectorLength'] / avg_speed['Speed'])  # time in seconds
     avg_speed['FastestTimeInSector'] = (avg_speed['SectorLength'] / avg_speed['FastestSpeed'])  # time in seconds
-    avg_speed['TimeLossToFastest'] = avg_speed['TimeInSector'] - avg_speed['FastestTimeInSector']
-
-    print(avg_speed)
+    
+    # Find average time gain for fastest driver in each minisector
+    sector_means = avg_speed.groupby('Minisector').apply(
+    lambda x: x.loc[x['DriverYear'] != x['Fastest'], 'TimeInSector'].mean()
+)
+    avg_speed['MeanTimeInSector'] = avg_speed['Minisector'].map(sector_means)
+    avg_speed['TimeGainFastest'] = avg_speed['MeanTimeInSector'] - avg_speed['FastestTimeInSector']
     
     reference_telemetry['Minisector'] = np.digitize(
         reference_telemetry['Distance'], bins=sector_bounds, right=False
@@ -209,7 +210,7 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
     
     #Merge avg_speed in results telemetry
     result_telemetry = result_telemetry.merge(
-        avg_speed[['Minisector', 'DriverYear', 'TimeLossToFastest']],
+        avg_speed[['Minisector', 'DriverYear', 'TimeGainFastest']],
         left_on=['Minisector', result_telemetry["Fastest"]],
         right_on=['Minisector', 'DriverYear'],
         how='left')
@@ -221,10 +222,11 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
         "fastest": result_telemetry["Fastest"],
         "driver": result_telemetry["Driver"],
         "year": result_telemetry["Year"],
-        "lossToFastest": round(result_telemetry["TimeLossToFastest"],2)
+        "TimeGainFastest": round(result_telemetry["TimeGainFastest"],4)
     })
-    
+
     return result.to_dict(orient="records")
+### ---- Braking Comparison ---- ####
 
 @app.get("/api/v1/braking-comparison")
 def braking_comparison(
@@ -435,8 +437,6 @@ def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: li
         .mean()
         .reset_index()
     )
-
-    #print(avg_speed)
 
     # Add sector labels
     labels = label_dict.get(session_name, {})
