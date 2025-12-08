@@ -75,6 +75,14 @@ def get_gear_data(session_year: int, session_name: str, identifier: str, driver:
 @app.get("/api/v1/track-dominance")
 def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
     telemetry_list = []
+    reference_driver = drivers[0]
+    reference_year = session_years[0]
+    
+    session_ref = get_loaded_session(reference_year, session_name, identifier)
+    reference_lap = session_ref.laps.pick_drivers(reference_driver).pick_fastest()
+    reference_telemetry = reference_lap.get_telemetry().add_distance()
+    reference_telemetry["Driver"] = reference_driver
+    reference_telemetry["Year"] = reference_year
     
     for year in session_years:
         session_event = get_loaded_session(year, session_name, identifier)
@@ -115,18 +123,21 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
     fastest = avg_speed.loc[
         avg_speed.groupby('Minisector')['Speed'].idxmax()
     ][['Minisector', 'DriverYear']].rename(columns={'DriverYear': 'Fastest'})
-
-    telemetry_all = telemetry_all.merge(fastest, on='Minisector')
-
-    telemetry_all = telemetry_all.sort_values(by=['Distance'])
+    
+    reference_telemetry['Minisector'] = np.digitize(
+        reference_telemetry['Distance'], bins=sector_bounds, right=False
+    )
+    result_telemetry = reference_telemetry.merge(
+        fastest, on='Minisector', how='left'
+    )
 
     result = pd.DataFrame({
-        "x": telemetry_all["X"],
-        "y": telemetry_all["Y"],
-        "minisector": telemetry_all["Minisector"],
-        "fastest_driver": telemetry_all["Fastest"],
-        "driver": telemetry_all["Driver"],
-        "year": telemetry_all["Year"]
+        "x": result_telemetry["X"],
+        "y": result_telemetry["Y"],
+        "minisector": result_telemetry["Minisector"],
+        "fastest": result_telemetry["Fastest"],
+        "driver": result_telemetry["Driver"],
+        "year": result_telemetry["Year"]
     })
 
     return result.to_dict(orient="records")

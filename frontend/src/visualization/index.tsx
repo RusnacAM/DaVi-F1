@@ -45,6 +45,9 @@ export const Visualization = () => {
   useEffect(() => {
     if (!data) return;
     const driverCodes = driverNames.map((d) => driverCode[d]);
+    const fastestList = driverCodes.flatMap((code) =>
+      sessionYears.map((year) => `${code}_${year}`)
+    );
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
@@ -53,7 +56,7 @@ export const Visualization = () => {
     const trackGroup = svg
       .append("g")
       .attr("class", "track-group")
-      .attr("transform", "translate(50, 0)");
+      .attr("transform", "translate(100, 0)");
 
     //  --- Track ---
     if (data && data.length > 0) {
@@ -82,34 +85,29 @@ export const Visualization = () => {
       .domain(yExtent)
       .range([height - margin, margin]);
 
+    // --- UNIQUE FASTEST DRIVER-YEAR LABELS ---
     const colorScale = d3
       .scaleOrdinal<string>()
-      .domain(driverCodes)
-      .range(d3.schemeDark2);
+      .domain(fastestList)
+      .range(d3.schemeTableau10);
 
     const startPoint = data[0];
-
-    // --- GROUP BY MINISECTOR ---
     const sectors = d3.group(data, (d) => d.minisector);
-
-    // --- GET UNIQUE FASTEST DRIVER-YEAR STRINGS ---
-    const fastestList = Array.from(new Set(data.map((d) => d.fastest_driver)));
 
     const line = d3
       .line<TrackDominancePoint>()
       .x((d) => xScale(d.x))
       .y((d) => yScale(d.y))
-      .curve(d3.curveLinear);
+      .curve(d3.curveCatmullRom.alpha(0.7));
 
     for (const [, points] of sectors) {
-      const fastest = points[0].fastest_driver; // all points share same fastest driver
-
-      svg
+      console.log(points[0].fastest);
+      trackGroup
         .append("path")
         .datum(points)
         .attr("fill", "none")
-        .attr("stroke", colorScale(fastest)!)
-        .attr("stroke-width", 6)
+        .attr("stroke", colorScale(points[0].fastest))
+        .attr("stroke-width", 8)
         .attr("d", line);
     }
 
@@ -124,10 +122,9 @@ export const Visualization = () => {
     }
 
     // --- Legend ---
-    console.log(driverCodes);
     const legend = legendGroup
       .selectAll(".legend")
-      .data(driverCodes)
+      .data(fastestList)
       .enter()
       .append("g")
       .attr("transform", (_, i) => `translate(0, ${30 + i * 20})`);
