@@ -12,7 +12,6 @@ import { fetchLapGapEvolution,
 import { CircularProgress } from "@mui/material";
 import { fetchAvgDiffs, type AvgDiffsResponse } from "../../api/fetchAvgDiffs";
 import { AvgDiffsChart } from "../AvgDiffs";
-import barChart from "../../../public/images/bar_chart.jpeg";
 import { driverCode } from "../../utils/configureFilterData";
 
 export interface TrackTabProps {
@@ -68,7 +67,6 @@ export const TrackTab: React.FC<TrackTabProps> = ({
       setData(response);
       setDataAvgDiffs(responseAvgDiffs);
       setDataLapGapEvolution(responseLapGapEvolution);
-      console.log(responseLapGapEvolution)
     } catch (error) {
       setLoadingState(false);
       console.error("Error fetching data:", error);
@@ -111,6 +109,8 @@ export const TrackTab: React.FC<TrackTabProps> = ({
             {data_lap_gap_evolution && !loadingState ? (
             <LapGapEvolution
               data={data_lap_gap_evolution}
+              sessionYears={sessionYears}
+              driverColorMap={driverColorMap}
             />
           ) : (
             <CircularProgress size={50} color="primary" />

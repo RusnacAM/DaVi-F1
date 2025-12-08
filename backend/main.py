@@ -553,7 +553,7 @@ def get_lap_gap_evolution(session_name: str, identifier: str,  drivers: List[str
 
                 # print(lap_gap)
             
-                result[driver] = lap_gap.to_dict(orient="records")
+                result[driver_year] = lap_gap.to_dict(orient="records")
 
     all_diffs = np.concatenate(time_diff_list)
     time_diff_min = all_diffs.min()

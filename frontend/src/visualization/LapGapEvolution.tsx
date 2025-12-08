@@ -1,12 +1,19 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { type LapGapEvolutionPoint } from "../api/fetchLapGapEvolution";
+import { getDriverYearColor } from "../utils/configureFilterData";
 
 export interface LapGapEvolutionProps {
     data: LapGapEvolutionPoint[];
+    sessionYears: string[];
+    driverColorMap: Record<string, string>;
 }
 
-export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
+export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
+    data,
+    sessionYears,
+    driverColorMap,
+}) => {
     const svgRef = useRef<SVGSVGElement>(null);
 
     useEffect(() => {
@@ -26,17 +33,9 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const drivers = Object.keys(data);
-        // console.log("Drivers:", drivers)
-        // console.log("Data:", data)
-
-
-        // Determine reference driver-year from first point
-        const firstPoint = Object.values(data)[0][0];
-        const referenceDriverYear = `${firstPoint.ref_driver} ${firstPoint.ref_year}`;
 
         // Flatten all non-reference points for scales
         const allPoints = Object.entries(data)
-            .filter(([key]) => key !== referenceDriverYear)
             .flatMap(([_, points]) => points);
 
         // Title
@@ -48,7 +47,7 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
             .attr("fill", "white")
             .attr("font-size", "16px")
             .attr("font-weight", "bold")
-            .text(`Lap Gap Evolution to fastest:" ${referenceDriverYear}`);
+            .text(`Lap Gap Evolution to fastest driver`);
 
         // Scales
         const xExtent = d3.extent(allPoints, (d) => d.x) as [number, number];
@@ -56,6 +55,8 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
 
         const xScale = d3.scaleLinear().domain(xExtent).range([0, innerWidth]);
         const yScale = d3.scaleLinear().domain([yExtent[0], yExtent[1]]).range([innerHeight, 0]);
+
+        const colorScale = (fastest: string) => getDriverYearColor(fastest, driverColorMap, sessionYears);
 
         // Axes
         g.append("g")
@@ -100,31 +101,17 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
 
         // Draw non-reference driver-year lines
         drivers.forEach((driverKey, i) => {
-            if (driverKey === referenceDriverYear) return;
+            // if (driverKey === referenceDriverYear) return;
 
             g.append("path")
                 .datum(data[driverKey])
+                .attr("stroke", () => {
+                    const key = driverKey.replace(" ", "_");
+                    return colorScale(key);
+                })
                 .attr("fill", "none")
-                .attr("stroke", d3.schemeCategory10[i % 10])
                 .attr("stroke-width", 2)
                 .attr("d", line);
-        });
-
-        // Legend
-        const legend = svg.append("g").attr("transform", `translate(${innerWidth + margin.left + 10}, ${margin.top})`);
-        drivers.forEach((driver, i) => {
-            const gLegend = legend.append("g").attr("transform", `translate(0, ${i * 20})`);
-            gLegend.append("rect")
-                .attr("width", 12)
-                .attr("height", 12)
-                .attr("fill", "white")
-                .attr("fill", d3.schemeCategory10[i % 10]);
-
-            gLegend.append("text")
-                .attr("x", 16)
-                .attr("y", 10)
-                .attr("fill", "white")
-                .text(driver);
         });
     }, [data]);
 
