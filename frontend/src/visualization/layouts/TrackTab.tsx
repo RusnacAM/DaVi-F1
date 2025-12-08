@@ -5,6 +5,10 @@ import {
   type TrackDominanceResponse,
 } from "../../api/fetchTrackDominance";
 import { TrackDominance } from "../TrackDominance";
+import { LapGapEvolution } from "../LapGapEvolution";
+import { fetchLapGapEvolution, 
+  type LapGapEvolutionResponse 
+} from "../../api/fetchLapGapEvolution";
 import { CircularProgress } from "@mui/material";
 import { fetchAvgDiffs, type AvgDiffsResponse } from "../../api/fetchAvgDiffs";
 import { AvgDiffsChart } from "../AvgDiffs";
@@ -28,6 +32,7 @@ export const TrackTab: React.FC<TrackTabProps> = ({
 }) => {
   const [data, setData] = useState<TrackDominanceResponse>([]);
   const [AvgDiffsData, setDataAvgDiffs] = useState<AvgDiffsResponse>([]);
+  const [data_lap_gap_evolution, setDataLapGapEvolution] = useState<LapGapEvolutionResponse>([]);
   const [loadingState, setLoadingState] = useState(false);
 
   const driverCodes = driverNames.map((d) => driverCode[d]);
@@ -53,9 +58,17 @@ export const TrackTab: React.FC<TrackTabProps> = ({
         driverNames,
         sessionYears
       );
+      const responseLapGapEvolution = await fetchLapGapEvolution(
+        sessionName,
+        sessionIdentifier,
+        driverNames,
+        sessionYears
+      );
 
       setData(response);
       setDataAvgDiffs(responseAvgDiffs);
+      setDataLapGapEvolution(responseLapGapEvolution);
+      console.log(responseLapGapEvolution)
     } catch (error) {
       setLoadingState(false);
       console.error("Error fetching data:", error);
@@ -94,7 +107,15 @@ export const TrackTab: React.FC<TrackTabProps> = ({
             <CircularProgress size={50} color="primary" />
           )}
         </div>
-        <img src={barChart} alt="Logo" width={700} height={300} />
+        <div className="lap-gap-evolution">
+            {data_lap_gap_evolution && !loadingState ? (
+            <LapGapEvolution
+              data={data_lap_gap_evolution}
+            />
+          ) : (
+            <CircularProgress size={50} color="primary" />
+          )}
+          </div>
       </div>
     </div>
   );

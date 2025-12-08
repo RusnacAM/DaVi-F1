@@ -7,7 +7,7 @@ type FilterConfigsContextValue = {
     sessionName: string,
     setSessionName: (newSessionName: string) => void,
     sessionIdentifier: string,
-    setSessionIdentifier: (newSessionIdentifiers: string) => void,
+    setSessionIdentifier: (newSessionIdentifier: string) => void,
     driverNames: string[],
     setDriverNames: (newDriverNames: string[]) => void,
     tabValue: number,
