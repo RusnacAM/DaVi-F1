@@ -25,7 +25,7 @@ export const Visualization = () => {
       setLoadingState(true);
       const response = await fetchTrackDominance(
         sessionName,
-        sessionIdentifiers[0],
+        sessionIdentifier,
         driverNames,
         sessionYears
       );
