@@ -545,18 +545,25 @@ def get_lap_gap_evolution(session_name: str, identifier: str,  drivers: List[str
                 lap_gap = pd.DataFrame({
                 "x": common_distance.tolist(),
                 "y": time_diff.tolist(),
-                # "ref_driver": reference_driver_year[:3],
-                # "ref_year": int(reference_driver_year[-4:]),
                 "driver": driver_year[:3],
                 "year": int(driver_year[-4:])
                 }).astype(object)
-
-                # print(lap_gap)
             
                 result[driver_year] = lap_gap.to_dict(orient="records")
 
-    all_diffs = np.concatenate(time_diff_list)
-    time_diff_min = all_diffs.min()
-    time_diff_max = all_diffs.max()
 
-    return result
+    circuit_info = session.get_circuit_info()
+
+    all_diffs = np.concatenate(time_diff_list)
+
+    corners = []
+    for _, corner in circuit_info.corners.iterrows():
+        corners.append({
+            "distance": float(corner["Distance"]),
+            "label": f"{corner['Number']}{corner['Letter']}",
+        })
+
+    return {
+        "lapGaps": result,
+        "corners": corners          
+    }
