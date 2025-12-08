@@ -36,15 +36,6 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
             .filter(([key]) => key !== referenceDriverYear)
             .flatMap(([_, points]) => points);
 
-        // // Flatten the object into array
-        // const flatData: LapGapEvolutionPoint[] = Object.values(data).flat();
-
-        // // Group by driver
-        // const driverData = drivers.reduce<Record<string, LapGapEvolutionPoint[]>>((acc, driver) => {
-        //     acc[driver] = data[driver];
-        //     return acc;
-        // }, {});
-
         // Title
         svg
             .append("text")
