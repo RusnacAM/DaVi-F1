@@ -35,7 +35,7 @@ export const TrackDominance: React.FC<TrackDominanceProps>  = ({ data }) => {
 
     const colorScale = d3
       .scaleOrdinal<string>()
-      .domain([...new Set(data.map((d) => d.fastest_driver))])
+      .domain([...new Set(data.map((d) => d.fastest))])
       .range(d3.schemeTableau10);
 
     const sectors = d3.group(data, (d) => d.minisector);
@@ -50,7 +50,7 @@ export const TrackDominance: React.FC<TrackDominanceProps>  = ({ data }) => {
         .append("path")
         .datum(points)
         .attr("fill", "none")
-        .attr("stroke", colorScale(points[0].fastest_driver)!)
+        .attr("stroke", colorScale(points[0].fastest)!)
         .attr("stroke-width", 8)
         .attr("d", line);
 
@@ -73,7 +73,7 @@ export const TrackDominance: React.FC<TrackDominanceProps>  = ({ data }) => {
     }
 
     // --- Legend ---
-    const drivers = Array.from(new Set(data.map((d) => d.fastest_driver)));
+    const drivers = Array.from(new Set(data.map((d) => d.fastest)));
     const legend = svg
       .selectAll(".legend")
       .data(drivers)

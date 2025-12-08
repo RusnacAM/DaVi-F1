@@ -141,3 +141,119 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
     })
 
     return result.to_dict(orient="records")
+
+
+@app.get("/api/v1/average-loss-to-fastest")
+def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
+    telemetry_list = []
+    
+    # Track overall fastest lap across all loaded laps
+    fastest_lap_time = None
+    fastest_driver_overall = None
+    fastest_year_overall = None
+
+    ### ---- Load telemetry data ---- ###
+
+    # Load all sessions and drivers' fastest laps
+    for year in session_years:
+        session_event = get_loaded_session(year, session_name, identifier)
+
+        for driver in drivers:
+            lap = session_event.laps.pick_drivers(driver).pick_fastest()
+
+            # skip if no lap found
+            if lap is None or getattr(lap, "empty", False):
+                continue
+
+            # Record overall fastest lap
+            if 'LapTime' in lap.index:
+                lap_time = lap['LapTime']
+            else:
+                # fallback attribute access if structure differs
+                lap_time = getattr(lap, 'LapTime', None)
+
+            if lap_time is not None and (fastest_lap_time is None or lap_time < fastest_lap_time):
+                fastest_lap_time = lap_time
+                fastest_driver_overall = driver
+                fastest_year_overall = year
+
+            telemetry = lap.get_telemetry().add_distance()
+
+            telemetry["Driver"] = driver
+            telemetry["Year"] = year
+            telemetry["DriverYear"] = f"{driver}_{year}"
+
+            telemetry_list.append(telemetry)
+
+
+    print(fastest_driver_overall, fastest_year_overall)
+    # Concatenate all telemetry data
+    telemetry_all = pd.concat(telemetry_list, ignore_index=True)
+
+    ### ---- Get mini sectors, labels added later ---- ###
+
+    # Create minisectors based on predefined sector bounds or equal divisions
+    if session_name in sector_dict.keys():
+        sector_bounds = sector_dict[session_name]
+    else:
+        num_minisectors = 12
+        sector_bounds = [0] * (num_minisectors + 1)
+        total_dist = telemetry_all['Distance'].max()
+
+        for i in range(1, num_minisectors + 1):
+            sector_bounds[i] = math.ceil(i * (total_dist / num_minisectors))
+
+    telemetry_all['Minisector'] = np.digitize(
+        telemetry_all['Distance'], bins=sector_bounds, right=False
+    )
+
+    # Get sector lengths
+    sector_lengths = []
+    for i in range(1, len(sector_bounds)):
+        sector_lengths.append(sector_bounds[i] - sector_bounds[i-1])
+    sector_length_df = pd.DataFrame({
+        'Minisector': list(range(1, len(sector_bounds))),
+        'SectorLength': sector_lengths
+    })
+
+    ### ---- Calculate average time and time loss to fastest driver per minisector ---- ### 
+
+    # Get average speed per driver per minisector
+    avg_speed = (
+        telemetry_all
+        .groupby(['Minisector', 'DriverYear'])['Speed']
+        .mean()
+        .reset_index()
+    )
+
+    # Add sector labels
+    labels = label_dict.get(session_name, {})
+    avg_speed['MinisectorLabel'] = avg_speed['Minisector'].map(labels)
+
+    # Transform speed to time per sector (in seconds)
+    avg_speed = avg_speed.merge(sector_length_df, on='Minisector')
+    avg_speed['Speed'] = avg_speed['Speed']/3.6 # convert to m/s
+    avg_speed['Time_sec'] = avg_speed['SectorLength'] / avg_speed['Speed']
+
+
+    # Find speed difference per minisector to overall fastest driver
+    avg_speed = avg_speed.merge(
+        avg_speed[avg_speed['DriverYear'] == f"{fastest_driver_overall}_{fastest_year_overall}"][['Minisector', 'Time_sec']],
+        on='Minisector',
+        suffixes=('', '_Fastest')
+    )
+
+    avg_speed['Diff_to_Fastest_sec'] =  avg_speed['Time_sec'] - avg_speed['Time_sec_Fastest']
+
+    #Find the average time loss per minisector label for each driver
+    avg_speed = (
+        avg_speed
+        .groupby(['DriverYear','MinisectorLabel'])['Diff_to_Fastest_sec']
+        .mean()
+        .reset_index()
+    )
+
+    avg_speed['FastestOverallDriver'] = fastest_driver_overall
+    avg_speed['FastestOverallYear'] = fastest_year_overall
+
+    return avg_speed.to_dict(orient='records')

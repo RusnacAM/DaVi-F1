@@ -1,7 +1,7 @@
 import { apiRequest } from "./api-client";
 import { driverCode } from "../utils/configureFilterData"
 
-export interface AvgDiffPoint {
+export interface AvgDiffsPoint {
   DriverYear: string;
   MinisectorLabel: string;
   Diff_to_Fastest_sec: number;
@@ -9,9 +9,9 @@ export interface AvgDiffPoint {
   FastestOverallYear: number;
 }
 
-export type TrackDominanceResponse = AvgDiffPoint[]
+export type AvgDiffsResponse = AvgDiffsPoint[]
 
-export const fetchAvgDiff = async (sessionName: string, identifier: string, drivers: string[], sessionYears: string[] ): Promise<AvgDiffResponse> => {
+export const fetchAvgDiffs = async (sessionName: string, identifier: string, drivers: string[], sessionYears: string[] ): Promise<AvgDiffsResponse> => {
   const driverCodes = drivers.map(d => driverCode[d]);
   let driversParam = "";
   driverCodes.forEach(driverCode => driversParam += `&drivers=${driverCode}`);
@@ -19,5 +19,5 @@ export const fetchAvgDiff = async (sessionName: string, identifier: string, driv
   let yearsParam = "";
   sessionYears.forEach(year => yearsParam += `&session_years=${year}`)
 
-  return await apiRequest<AvgDiffResponse>(`/AvgDiff?session_name=${sessionName}&identifier=${identifier}${driversParam}${yearsParam}`, 'GET')
+  return await apiRequest<AvgDiffsResponse>(`/AvgDiff?session_name=${sessionName}&identifier=${identifier}${driversParam}${yearsParam}`, 'GET')
 };
