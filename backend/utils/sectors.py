@@ -108,8 +108,7 @@ label_dict = {
     'Spanish Grand Prix': labels_spanish,
     'British Grand Prix': labels_britian,
     'Bahrain Grand Prix': labels_bahrain,
-    'AbuDhabi Grand Prix': labels_abuDhabi,
+    'Abu Dhabi Grand Prix': labels_abuDhabi,
     'Italian Grand Prix': labels_italy,
     'Austrian Grand Prix': labels_austria
-
 }

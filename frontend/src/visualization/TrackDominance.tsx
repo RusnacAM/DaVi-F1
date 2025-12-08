@@ -96,7 +96,8 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
               Minisector: ${points[0].minisector}<br>
               Driver: ${codeToDriver[points[0].driver]}<br>
               Year: ${points[0].year}<br>
-              Time gain to average: ${points[0].TimeGainFastest}s
+              Time gain to average: ${points[0].TimeGainFastest}s<br>
+              Mini sector type: ${points[0].Label}
               `
             )
             .style("opacity", 1)
