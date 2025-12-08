@@ -143,7 +143,7 @@ export const TrackTab: React.FC<TrackTabProps> = ({
 
           <div className="lap-gap-evolution">
             {data_lap_gap_evolution && !loadingState ? (
-              <LapGapEvolution data={data_lap_gap_evolution} />
+              <LapGapEvolution data={data_lap_gap_evolution} driverColorMap={driverColorMap} sessionYears={sessionYears} />
             ) : (
               <CircularProgress size={50} color="primary" />
             )}
