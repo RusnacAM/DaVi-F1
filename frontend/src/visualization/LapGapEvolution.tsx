@@ -48,7 +48,7 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
             .attr("fill", "white")
             .attr("font-size", "16px")
             .attr("font-weight", "bold")
-            .text("Lap Gap Evolution");
+            .text(`Lap Gap Evolution to fastest:" ${referenceDriverYear}`);
 
         // Scales
         const xExtent = d3.extent(allPoints, (d) => d.x) as [number, number];
@@ -58,21 +58,23 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
         const yScale = d3.scaleLinear().domain([yExtent[0], yExtent[1]]).range([innerHeight, 0]);
 
         // Axes
-        g
-            .append("g")
+        g.append("g")
             .attr("transform", `translate(0,${innerHeight})`)
             .call(d3.axisBottom(xScale))
             .append("text")
+            .style("font-size", "14px")
+            .style("font-weight", "bold")
             .attr("x", innerWidth / 2)
             .attr("y", 40)
             .attr("fill", "white")
             .attr("text-anchor", "middle")
             .text("Track Distance (m)");
 
-        g
-            .append("g")
+        g.append("g")
             .call(d3.axisLeft(yScale))
             .append("text")
+            .style("font-size", "14px")
+            .style("font-weight", "bold")
             .attr("transform", "rotate(-90)")
             .attr("x", -innerHeight / 2)
             .attr("y", -45)
@@ -81,8 +83,7 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
             .text("Time Difference (s)");
 
         // Draw reference driver as horizontal line y=0
-        g
-            .append("line")
+        g.append("line")
             .attr("x1", 0)
             .attr("y1", yScale(0))
             .attr("x2", innerWidth)

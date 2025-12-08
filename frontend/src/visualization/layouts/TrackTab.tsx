@@ -96,15 +96,6 @@ export const TrackTab: React.FC<TrackTabProps> = ({
         )}
       </div>
       <div className="supporting-chart">
-        <div className="lap-gap-evolution">
-            {data_lap_gap_evolution && !loadingState ? (
-            <LapGapEvolution
-              data={data_lap_gap_evolution}
-            />
-          ) : (
-            <CircularProgress size={50} color="primary" />
-          )}
-          </div>
         <div className="AvgDiffs-Chart">
           {AvgDiffsData && !loadingState ? (
             <AvgDiffsChart
@@ -116,7 +107,15 @@ export const TrackTab: React.FC<TrackTabProps> = ({
             <CircularProgress size={50} color="primary" />
           )}
         </div>
-        <img src={barChart} alt="Logo" width={700} height={300} />
+        <div className="lap-gap-evolution">
+            {data_lap_gap_evolution && !loadingState ? (
+            <LapGapEvolution
+              data={data_lap_gap_evolution}
+            />
+          ) : (
+            <CircularProgress size={50} color="primary" />
+          )}
+          </div>
       </div>
     </div>
   );
