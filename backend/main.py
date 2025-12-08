@@ -369,11 +369,13 @@ def get_lap_gap_evolution(session_name: str, identifier: str,  drivers: List[str
                 lap_gap = pd.DataFrame({
                 "x": common_distance.tolist(),
                 "y": time_diff.tolist(),
-                "ref_driver": reference_driver_year[:3],
-                "ref_year": int(reference_driver_year[-4:]),
+                # "ref_driver": reference_driver_year[:3],
+                # "ref_year": int(reference_driver_year[-4:]),
                 "driver": driver_year[:3],
                 "year": int(driver_year[-4:])
                 }).astype(object)
+
+                # print(lap_gap)
             
                 result[driver] = lap_gap.to_dict(orient="records")
 

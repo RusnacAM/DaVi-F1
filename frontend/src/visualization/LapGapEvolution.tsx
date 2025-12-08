@@ -26,6 +26,9 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const drivers = Object.keys(data);
+        // console.log("Drivers:", drivers)
+        // console.log("Data:", data)
+
 
         // Determine reference driver-year from first point
         const firstPoint = Object.values(data)[0][0];
@@ -54,7 +57,6 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
         const xScale = d3.scaleLinear().domain(xExtent).range([0, innerWidth]);
         const yScale = d3.scaleLinear().domain([yExtent[0], yExtent[1]]).range([innerHeight, 0]);
 
-
         // Axes
         g
             .append("g")
@@ -79,12 +81,13 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
             .text("Time Difference (s)");
 
         // Draw reference driver as horizontal line y=0
-        g.append("line")
+        g
+            .append("line")
             .attr("x1", 0)
             .attr("y1", yScale(0))
             .attr("x2", innerWidth)
             .attr("y2", yScale(0))
-            .attr("stroke", "black")
+            .attr("stroke", "white")
             .attr("stroke-dasharray", "5,5")
             .attr("stroke-width", 2);
 

@@ -47,6 +47,7 @@ export const TrackTab: React.FC<TrackTabProps> = ({
         sessionYears
       );
       setDataLapGapEvolution(responseLapGapEvolution);
+      console.log(responseLapGapEvolution)
     } catch (error) {
       setLoadingState(false);
       console.error("Error fetching data:", error);

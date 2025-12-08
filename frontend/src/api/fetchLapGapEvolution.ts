@@ -4,8 +4,6 @@ import { driverCode } from "../utils/configureFilterData"
 export interface LapGapEvolutionPoint {
   x: number;
   y: number;
-  ref_driver: string;
-  ref_year: number;
   driver: string;
   year: number;
 }
