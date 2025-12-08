@@ -55,6 +55,15 @@
 
 .AvgDiffs-Chart {
   width: 700px;
+  height: 350px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.lap-gap-evolution {
+  margin-top: 30px;
+  width: 700px;
   height: 300px;
   display: flex;
   justify-content: center;

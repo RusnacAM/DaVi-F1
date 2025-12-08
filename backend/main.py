@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import os
 import math
+from scipy import interpolate
 
 from utils.sectors import sector_dict, label_dict, labels_spanish, labels_bahrain, labels_austria, labels_italy, labels_britian, labels_abuDhabi
 from typing import List
@@ -469,3 +470,93 @@ def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: li
     avg_speed['FastestOverallYear'] = fastest_year_overall
 
     return avg_speed.to_dict(orient='records')
+
+
+@app.get("/api/v1/lap-gap-evolution")
+def get_lap_gap_evolution(session_name: str, identifier: str,  drivers: List[str] = Query(None), session_years: List[int] = Query(None)):
+    fastest_laps = {}
+    telemetry_data = {}
+
+    for year in session_years:
+        session = get_loaded_session(year, session_name, identifier)
+        for driver in drivers:
+            lap = session.laps.pick_drivers(driver).pick_fastest()
+
+            if lap is None or len(lap) == 0:
+                continue
+            
+            fastest_laps[(driver, year)] = lap['LapTime']
+
+            telemetry = lap.get_telemetry().add_distance()
+            telemetry['Driver'] = driver
+            telemetry['Year'] = year
+            telemetry['DriverYear'] = f"{driver} {year}"
+
+            telemetry_data[f"{driver} {year}"] = telemetry.reset_index(drop=True) 
+
+    reference_driver_year = min(fastest_laps, key=fastest_laps.get)
+    reference_driver_year = f"{reference_driver_year[0]} {reference_driver_year[1]}"
+    ref_tel = telemetry_data[reference_driver_year]
+    common_distance = ref_tel['Distance'].values
+
+        
+    # Store interpolated speed data
+    interpolated_speeds = {}
+        
+    # Interpolate all drivers to common distance points
+    for driver_year in telemetry_data.keys():
+        tel = telemetry_data[driver_year]
+                
+        if len(tel['Distance']) > 10:
+            f_speed = interpolate.interp1d(
+                tel['Distance'], tel['Speed'],
+                kind='linear', bounds_error=False, 
+                fill_value='extrapolate'
+            )
+            interpolated_speeds[driver_year] = f_speed(common_distance)
+    
+    time_diff_list = []
+
+    # Calculate cumulative time differences
+    result = {}
+    if reference_driver_year in interpolated_speeds:
+        ref_speed = interpolated_speeds[reference_driver_year]
+                
+        for driver_year in interpolated_speeds.keys():
+            if driver_year != reference_driver_year:
+                driver_speed = interpolated_speeds[driver_year]
+                        
+                # Calculate distance segments
+                distance_segments = np.diff(common_distance)
+                distance_segments = np.append(distance_segments, distance_segments[-1])
+                    
+                # Prevent division by zero
+                ref_speed_safe = np.maximum(ref_speed, 1.0)
+                driver_speed_safe = np.maximum(driver_speed, 1.0)
+                        
+                # Time calculation: t = d / v (convert km/h to m/s)
+                ref_time_segments = distance_segments / (ref_speed_safe / 3.6)
+                driver_time_segments = distance_segments / (driver_speed_safe / 3.6)
+                    
+                # Cumulative time difference
+                time_diff = np.cumsum(driver_time_segments - ref_time_segments)
+                time_diff_list.append(time_diff)
+
+                lap_gap = pd.DataFrame({
+                "x": common_distance.tolist(),
+                "y": time_diff.tolist(),
+                # "ref_driver": reference_driver_year[:3],
+                # "ref_year": int(reference_driver_year[-4:]),
+                "driver": driver_year[:3],
+                "year": int(driver_year[-4:])
+                }).astype(object)
+
+                # print(lap_gap)
+            
+                result[driver] = lap_gap.to_dict(orient="records")
+
+    all_diffs = np.concatenate(time_diff_list)
+    time_diff_min = all_diffs.min()
+    time_diff_max = all_diffs.max()
+
+    return result
