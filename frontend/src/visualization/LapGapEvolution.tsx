@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { type LapGapEvolutionPoint } from "../api/fetchLapGapEvolution";
 import { getDriverYearColor } from "../utils/configureFilterData";
-import { getDriverYearColor } from "../utils/configureFilterData";
 
 export interface LapGapEvolutionProps {
     data: LapGapEvolutionPoint[];
