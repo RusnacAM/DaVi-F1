@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import * as d3 from "d3";
 import {
   fetchTrackDominance,
   type TrackDominanceResponse,
@@ -9,6 +10,10 @@ import { fetchLapGapEvolution,
   type LapGapEvolutionResponse 
 } from "../../api/fetchLapGapEvolution";
 import { CircularProgress } from "@mui/material";
+import { fetchAvgDiffs, type AvgDiffsResponse } from "../../api/fetchAvgDiffs";
+import { AvgDiffsChart } from "../AvgDiffs";
+import barChart from "../../../public/images/bar_chart.jpeg";
+import { driverCode } from "../../utils/configureFilterData";
 
 export interface TrackTabProps {
   sessionYears: string[];
@@ -23,29 +28,45 @@ export const TrackTab: React.FC<TrackTabProps> = ({
   sessionName,
   sessionIdentifier,
   driverNames,
-  refreshKey
+  refreshKey,
 }) => {
   const [data, setData] = useState<TrackDominanceResponse>([]);
+  const [AvgDiffsData, setDataAvgDiffs] = useState<AvgDiffsResponse>([]);
   const [data_lap_gap_evolution, setDataLapGapEvolution] = useState<LapGapEvolutionResponse>([]);
   const [loadingState, setLoadingState] = useState(false);
+
+  const driverCodes = driverNames.map((d) => driverCode[d]);
+  const baseColors = d3.schemeTableau10;
+  const driverColorMap: Record<string, string> = {};
+  driverCodes.forEach((code, i) => {
+    driverColorMap[code] = baseColors[i % baseColors.length];
+  });
 
   const fetchData = async () => {
     try {
       setLoadingState(true);
+
       const response = await fetchTrackDominance(
         sessionName,
         sessionIdentifier,
         driverNames,
         sessionYears
       );
-      setData(response);
-
+      const responseAvgDiffs = await fetchAvgDiffs(
+        sessionName,
+        sessionIdentifier,
+        driverNames,
+        sessionYears
+      );
       const responseLapGapEvolution = await fetchLapGapEvolution(
         sessionName,
         sessionIdentifier,
         driverNames,
         sessionYears
       );
+
+      setData(response);
+      setDataAvgDiffs(responseAvgDiffs);
       setDataLapGapEvolution(responseLapGapEvolution);
       console.log(responseLapGapEvolution)
     } catch (error) {
@@ -68,6 +89,7 @@ export const TrackTab: React.FC<TrackTabProps> = ({
             data={data}
             driverNames={driverNames}
             sessionYears={sessionYears}
+            driverColorMap={driverColorMap}
           />
         ) : (
           <CircularProgress size={50} color="primary" />
@@ -83,8 +105,18 @@ export const TrackTab: React.FC<TrackTabProps> = ({
             <CircularProgress size={50} color="primary" />
           )}
           </div>
-        {/* <img src={areaChart} alt="Logo" width={700} height={300} />
-        <img src={barChart} alt="Logo" width={700} height={300} /> */}
+        <div className="AvgDiffs-Chart">
+          {AvgDiffsData && !loadingState ? (
+            <AvgDiffsChart
+              data={AvgDiffsData}
+              sessionYears={sessionYears}
+              driverColorMap={driverColorMap}
+            />
+          ) : (
+            <CircularProgress size={50} color="primary" />
+          )}
+        </div>
+        <img src={barChart} alt="Logo" width={700} height={300} />
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { fetchBrakingDistribution, type BrakingDistributionPoint } from "../../a
 import { fetchBrakingComparison, type BrakingPoint } from "../../api/fetchBrakingComparison";
 import { BrakingComparison } from "../BrakingComparison";
 import { TelemetryLineChart } from "../../components/TelemetryLineChart";
+import { CircularProgress } from "@mui/material";
 
 export interface BreakingTabProps {
   sessionYears: string[];
@@ -83,33 +84,53 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
         padding: "10px 0",
       }}
     >
-      {/* Braking Comparison */}
-      <section style={{ width: "80%", margin: "0 auto" }}>
-        <h3 style={{ color: "white", marginBottom: "10px" }}>Braking Comparison</h3>
-        {loadingState && <div style={{ color: "white" }}>Loading braking data...</div>}
-        {!loadingState && brakingData && <BrakingComparison data={brakingData} />}
-        {!loadingState && !brakingData && (
-          <div style={{ color: "#ccc" }}>No braking data available for this session/driver.</div>
-        )}
-      </section>
+    {/* Braking Comparison */}
+    <section style={{ width: "80%", margin: "0 auto" }}>
+      <h3 style={{ color: "white", marginBottom: "10px" }}>Braking Comparison</h3>
 
-      {/* Throttle Line Chart */}
-      {telemetryData && (
-        <section style={{ width: "80%", margin: "0 auto" }}>
-          <h3 style={{ color: "white", marginBottom: "10px" }}>Throttle Input Comparison</h3>
-          <TelemetryLineChart
-            data={telemetryData}
-            metric="Throttle"
-            label="Throttle (%)"
-          />
-        </section>
+      {loadingState ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+          <CircularProgress size={50} color="primary" />
+        </div>
+      ) : brakingData ? (
+        <BrakingComparison data={brakingData} />
+      ) : (
+        <div style={{ color: "#ccc" }}>
+          No braking data available for this session/driver.
+        </div>
       )}
+    </section>
 
-      {/* Braking Distribution Box Plot */}
-      <section style={{ width: "60%" }}>
-        <h3 style={{ color: "white", marginBottom: "10px" }}>Braking Distribution</h3>
+    {/* Throttle Line Chart */}
+    <section style={{ width: "80%", margin: "0 auto" }}>
+      <h3 style={{ color: "white", marginBottom: "10px" }}>Throttle Input Comparison</h3>
+
+      {loadingState ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+          <CircularProgress size={50} color="primary" />
+        </div>
+      ) : telemetryData ? (
+        <TelemetryLineChart
+          data={telemetryData}
+          metric="Throttle"
+          label="Throttle (%)"
+        />
+      ) : null}
+    </section>
+
+    {/* Braking Distribution Box Plot */}
+    <section style={{ width: "60%", margin: "0 auto" }}>
+      <h3 style={{ color: "white", marginBottom: "10px" }}>Braking Distribution</h3>
+
+      {loadingState ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+          <CircularProgress size={50} color="primary" />
+        </div>
+      ) : (
         <BrakingDistributionBoxPlot data={brakingDist} />
-      </section>
+      )}
+    </section>
+
     </div>
   );
 };
