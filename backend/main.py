@@ -104,7 +104,7 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
     telemetry_list = []
     
     # Track overall fastest lap across all loaded laps
-    lap = None
+    ref_lap = None
     fastest_lap_time = None
     fastest_driver_overall = None
     fastest_year_overall = None
@@ -130,10 +130,14 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
                 lap_time = getattr(lap, 'LapTime', None)
 
             if lap_time is not None and (fastest_lap_time is None or lap_time < fastest_lap_time):
-                lap = session_event.laps.pick_drivers(driver).pick_fastest()
+                #ref_lap = session_event.laps.pick_drivers(driver).pick_fastest()
                 fastest_lap_time = lap_time
                 fastest_driver_overall = driver
                 fastest_year_overall = year
+
+            if ref_lap is None:
+                # random (slow) lap
+                ref_lap = session_event.laps.pick_drivers(driver).pick_lap(2)
 
             telemetry = lap.get_telemetry().add_distance()
 
@@ -146,9 +150,11 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
     # Concatenate all telemetry data
     telemetry_all = pd.concat(telemetry_list, ignore_index=True)
 
-    reference_telemetry = lap.get_telemetry().add_distance()
+    reference_telemetry = ref_lap.get_telemetry().add_distance()
     reference_telemetry["Driver"] = fastest_driver_overall
     reference_telemetry["Year"] = fastest_year_overall
+
+    print(reference_telemetry.size)
 
     if session_name in sector_dict.keys():
         sector_bounds = sector_dict[session_name]
