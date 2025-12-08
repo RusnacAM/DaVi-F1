@@ -21,6 +21,20 @@
   padding: 0px 10px;
 }
 
+.legend-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding-top: 10px;
+  gap: 15px;
+}
+
+.legend-color-block {
+  display: flex;
+  align-items: center;
+}
+
 .chart-container {
   display: flex;
   flex-direction: row;
