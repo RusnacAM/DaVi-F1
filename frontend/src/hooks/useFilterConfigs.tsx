@@ -6,8 +6,8 @@ type FilterConfigsContextValue = {
     setSessionYears: (newSessionYears: string[]) => void,
     sessionName: string,
     setSessionName: (newSessionName: string) => void,
-    sessionIdentifiers: string[],
-    setSessionIdentifiers: (newSessionIdentifiers: string[]) => void,
+    sessionIdentifier: string,
+    setSessionIdentifier: (newSessionIdentifiers: string) => void,
     driverNames: string[],
     setDriverNames: (newDriverNames: string[]) => void
 }
@@ -22,7 +22,7 @@ export const FilterConfigsProvider: React.FC<{
 
     const [sessionYears, setSessionYears] = useState<string[]>(["2025"]);
     const [sessionName, setSessionName] = useState<string>("Australian Grand Prix");
-    const [sessionIdentifiers, setSessionIdentifiers] = useState<string[]>(["Race"])
+    const [sessionIdentifier, setSessionIdentifier] = useState<string>("Race")
     const [driverNames, setDriverNames] = useState<string[]>(["Max Verstappen", "Lando Norris"]);
 
     return (
@@ -31,8 +31,8 @@ export const FilterConfigsProvider: React.FC<{
         setSessionYears,
         sessionName,
         setSessionName,
-        sessionIdentifiers,
-        setSessionIdentifiers,
+        sessionIdentifier,
+        setSessionIdentifier,
         driverNames,
         setDriverNames
       }}>

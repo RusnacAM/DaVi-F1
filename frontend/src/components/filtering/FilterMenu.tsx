@@ -22,8 +22,8 @@ const FilterMenu: React.FC<FilterMenuProps> = ({
         setSessionYears,
         sessionName,
         setSessionName,
-        sessionIdentifiers,
-        setSessionIdentifiers,
+        sessionIdentifier,
+        setSessionIdentifier,
     } = useFilterConfigs();
     
     // the session names intersection over all the selected years 
@@ -55,10 +55,10 @@ const FilterMenu: React.FC<FilterMenuProps> = ({
     const selectButtonDisabled = useMemo(() => {
         return  sessionYears.length === 0 
                 || sessionName === "" 
-                || sessionIdentifiers.length === 0
+                || sessionIdentifier === ""
                 || driverNames.length === 0
                 || isLoading
-    }, [sessionYears, sessionName, sessionIdentifiers, driverNames, isLoading])
+    }, [sessionYears, sessionName, sessionIdentifier, driverNames, isLoading])
 
     return (
         <div className="filters">
@@ -76,9 +76,9 @@ const FilterMenu: React.FC<FilterMenuProps> = ({
                 width={220}
             />
 
-            <MultiSelect
-                value={sessionIdentifiers}
-                setValue={setSessionIdentifiers}
+            <FilterSelect
+                value={sessionIdentifier}
+                setValue={setSessionIdentifier}
                 menuItems={SESSION_IDENTIFIERS}
                 width={150}
             />
