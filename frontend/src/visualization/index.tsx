@@ -24,10 +24,10 @@ export const Visualization = () => {
     try {
       setLoadingState(true);
       const response = await fetchTrackDominance(
-        sessionYears[0],
         sessionName,
         sessionIdentifiers[0],
-        driverNames
+        driverNames,
+        sessionYears
       );
       setData(response);
     } catch (error) {
@@ -45,6 +45,9 @@ export const Visualization = () => {
   useEffect(() => {
     if (!data) return;
     const driverCodes = driverNames.map((d) => driverCode[d]);
+    const fastestList = driverCodes.flatMap((code) =>
+      sessionYears.map((year) => `${code}_${year}`)
+    );
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
@@ -53,7 +56,7 @@ export const Visualization = () => {
     const trackGroup = svg
       .append("g")
       .attr("class", "track-group")
-      .attr("transform", "translate(50, 0)");
+      .attr("transform", "translate(100, 0)");
 
     //  --- Track ---
     const width = 500;
@@ -73,10 +76,11 @@ export const Visualization = () => {
       .domain(yExtent)
       .range([height - margin, margin]);
 
+    // --- UNIQUE FASTEST DRIVER-YEAR LABELS ---
     const colorScale = d3
       .scaleOrdinal<string>()
-      .domain(driverCodes)
-      .range(d3.schemeDark2);
+      .domain(fastestList)
+      .range(d3.schemeTableau10);
 
     const startPoint = data[0];
     const sectors = d3.group(data, (d) => d.minisector);
@@ -84,32 +88,18 @@ export const Visualization = () => {
     const line = d3
       .line<TrackDominancePoint>()
       .x((d) => xScale(d.x))
-      .y((d) => yScale(d.y));
+      .y((d) => yScale(d.y))
+      .curve(d3.curveCatmullRom.alpha(0.7));
 
     for (const [, points] of sectors) {
+      console.log(points[0].fastest);
       trackGroup
         .append("path")
         .datum(points)
         .attr("fill", "none")
-        .attr("stroke", colorScale(points[0].fastest_driver)!)
+        .attr("stroke", colorScale(points[0].fastest))
         .attr("stroke-width", 8)
         .attr("d", line);
-
-      const midIndex = Math.floor(points.length / 2);
-      const midPoint = points[midIndex];
-
-      trackGroup
-        .append("text")
-        .attr("x", xScale(midPoint.x))
-        .attr("y", yScale(midPoint.y))
-        .attr("text-anchor", "middle")
-        .attr("alignment-baseline", "middle")
-        .attr("font-size", 10)
-        .attr("fill", "white")
-        .attr("stroke", "black")
-        .attr("stroke-width", 0.5)
-        .attr("paint-order", "stroke")
-        .text(midPoint.minisector);
     }
 
     if (startPoint) {
@@ -123,10 +113,9 @@ export const Visualization = () => {
     }
 
     // --- Legend ---
-    console.log(driverCodes);
     const legend = legendGroup
       .selectAll(".legend")
-      .data(driverCodes)
+      .data(fastestList)
       .enter()
       .append("g")
       .attr("transform", (_, i) => `translate(0, ${30 + i * 20})`);
