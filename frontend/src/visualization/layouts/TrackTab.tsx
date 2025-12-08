@@ -9,7 +9,10 @@ import { CircularProgress } from "@mui/material";
 import { fetchAvgDiffs, type AvgDiffsResponse } from "../../api/fetchAvgDiffs";
 import { AvgDiffsChart } from "../AvgDiffs";
 import barChart from "../../../public/images/bar_chart.jpeg";
-import { driverCode } from "../../utils/configureFilterData";
+import {
+  driverCode,
+  getDriverYearColor,
+} from "../../utils/configureFilterData";
 
 export interface TrackTabProps {
   sessionYears: string[];
@@ -69,24 +72,38 @@ export const TrackTab: React.FC<TrackTabProps> = ({
   }, [refreshKey]);
 
   return (
-    <div className="chart-container">
-      <div className="track-map">
-        {data && !loadingState ? (
-          <TrackDominance
-            data={data}
-            driverNames={driverNames}
-            sessionYears={sessionYears}
-            driverColorMap={driverColorMap}
-          />
-        ) : (
-          <CircularProgress size={50} color="primary" />
-        )}
+    <>
+      <div className="legend-container" style={{ marginBottom: "20px" }}>
+        {driverNames.flatMap((driverName) => {
+          const code = driverCode[driverName];
+
+          return sessionYears.map((year) => {
+            const key = `${code}_${year}`;
+            const color = getDriverYearColor(key, driverColorMap, sessionYears);
+
+            return (
+              <div className="legend-color-block">
+                <div
+                  style={{
+                    width: "14px",
+                    height: "14px",
+                    backgroundColor: color,
+                    borderRadius: "3px",
+                    marginRight: "6px",
+                  }}
+                />
+                <span>{code} {year}</span>
+              </div>
+            );
+          });
+        })}
       </div>
-      <div className="supporting-chart">
-        <div className="AvgDiffs-Chart">
-          {AvgDiffsData && !loadingState ? (
-            <AvgDiffsChart
-              data={AvgDiffsData}
+
+      <div className="chart-container">
+        <div className="track-map">
+          {data && !loadingState ? (
+            <TrackDominance
+              data={data}
               sessionYears={sessionYears}
               driverColorMap={driverColorMap}
             />
@@ -94,8 +111,23 @@ export const TrackTab: React.FC<TrackTabProps> = ({
             <CircularProgress size={50} color="primary" />
           )}
         </div>
-        <img src={barChart} alt="Logo" width={700} height={300} />
+
+        <div className="supporting-chart">
+          <div className="AvgDiffs-Chart">
+            {AvgDiffsData && !loadingState ? (
+              <AvgDiffsChart
+                data={AvgDiffsData}
+                sessionYears={sessionYears}
+                driverColorMap={driverColorMap}
+              />
+            ) : (
+              <CircularProgress size={50} color="primary" />
+            )}
+          </div>
+
+          <img src={barChart} alt="Logo" width={700} height={250} />
+        </div>
       </div>
-    </div>
+    </>
   );
 };
