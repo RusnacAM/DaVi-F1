@@ -5,14 +5,12 @@ import { driverCode, getDriverYearColor } from "../utils/configureFilterData";
 
 export interface TrackDominanceProps {
   data: TrackDominancePoint[];
-  driverNames: string[];
   sessionYears: string[];
   driverColorMap: Record<string, string>;
 }
 
 export const TrackDominance: React.FC<TrackDominanceProps> = ({
   data,
-  driverNames,
   sessionYears,
   driverColorMap,
 }) => {
@@ -21,17 +19,12 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
   const codeToDriver = Object.fromEntries(
     Object.entries(driverCode).map(([name, code]) => [code, name])
   );
-  const driverCodes = driverNames.map((d) => driverCode[d]);
-  const fastestList = driverCodes.flatMap((code) =>
-    sessionYears.map((year) => `${code}_${year}`)
-  );
 
   useEffect(() => {
     if (!data) return;
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const legendGroup = svg.append("g").attr("class", "legend-group");
     const trackGroup = svg
       .append("g")
       .attr("class", "track-group")
@@ -96,7 +89,7 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
               Minisector: ${points[0].minisector}<br>
               Driver: ${codeToDriver[points[0].driver]}<br>
               Year: ${points[0].year}<br>
-              Time gain to average: ${points[0].TimeGainFastest}s
+              Time Gain to Average: ${points[0].TimeGainFastest}s
               `
             )
             .style("opacity", 1)
@@ -118,28 +111,6 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
         .attr("width", 21)
         .attr("height", 21);
     }
-
-    // --- Legend ---
-    const legend = legendGroup
-      .selectAll(".legend")
-      .data(fastestList)
-      .enter()
-      .append("g")
-      .attr("transform", (_, i) => `translate(0, ${30 + i * 20})`);
-
-    legend
-      .append("rect")
-      .attr("width", 12)
-      .attr("height", 12)
-      .attr("fill", (d) => colorScale(d)!);
-
-    legend
-      .append("text")
-      .attr("x", 20)
-      .attr("y", 10)
-      .attr("font-size", 12)
-      .attr("fill", "white")
-      .text((d) => d);
   }, [data]);
 
   return <svg ref={svgRef} width={675} height={500}></svg>;

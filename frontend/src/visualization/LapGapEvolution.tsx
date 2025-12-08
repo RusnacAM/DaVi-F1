@@ -1,132 +1,127 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { type LapGapEvolutionPoint } from "../api/fetchLapGapEvolution";
+import { getDriverYearColor } from "../utils/configureFilterData";
 
 export interface LapGapEvolutionProps {
-    data: LapGapEvolutionPoint[];
+  data: LapGapEvolutionPoint[];
+  driverColorMap: Record<string, string>;
+  sessionYears: string[];
 }
 
-export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({ data }) => {
-    const svgRef = useRef<SVGSVGElement>(null);
+export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
+  data,
+  driverColorMap,
+  sessionYears,
+}) => {
+  const svgRef = useRef<SVGSVGElement>(null);
 
-    useEffect(() => {
-        if (!data || Object.keys(data).length === 0) return;
+  useEffect(() => {
+    if (!data || Object.keys(data).length === 0) return;
 
-        const svg = d3.select(svgRef.current);
-        svg.selectAll("*").remove();
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
 
-        const width = 700;
-        const height = 350;
-        const margin = { top: 40, right: 100, bottom: 50, left: 60 };
-        const innerWidth = width - margin.left - margin.right;
-        const innerHeight = height - margin.top - margin.bottom;
+    const width = 700;
+    const height = 350;
+    const margin = { top: 40, right: 100, bottom: 50, left: 60 };
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
 
-        const g = svg
-            .append("g")
-            .attr("transform", `translate(${margin.left},${margin.top})`);
+    const g = svg
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
 
-        const drivers = Object.keys(data);
-        // console.log("Drivers:", drivers)
-        // console.log("Data:", data)
+    const drivers = Object.keys(data);
 
+    // Determine reference driver-year from first point
+    const firstPoint = Object.values(data)[0][0];
+    const referenceDriverYear = `${firstPoint.ref_driver} ${firstPoint.ref_year}`;
 
-        // Determine reference driver-year from first point
-        const firstPoint = Object.values(data)[0][0];
-        const referenceDriverYear = `${firstPoint.ref_driver} ${firstPoint.ref_year}`;
+    // Flatten all non-reference points for scales
+    const allPoints = Object.entries(data)
+      .filter(([key]) => key !== referenceDriverYear)
+      .flatMap(([_, points]) => points);
 
-        // Flatten all non-reference points for scales
-        const allPoints = Object.entries(data)
-            .filter(([key]) => key !== referenceDriverYear)
-            .flatMap(([_, points]) => points);
+    // Title
+    svg
+      .append("text")
+      .attr("x", width / 2)
+      .attr("y", margin.top / 2)
+      .attr("text-anchor", "middle")
+      .attr("fill", "white")
+      .attr("font-size", "16px")
+      .attr("font-weight", "bold")
+      .text(`Lap Gap Evolution to fastest:" ${referenceDriverYear}`);
 
-        // Title
-        svg
-            .append("text")
-            .attr("x", width / 2)
-            .attr("y", margin.top / 2)
-            .attr("text-anchor", "middle")
-            .attr("fill", "white")
-            .attr("font-size", "16px")
-            .attr("font-weight", "bold")
-            .text(`Lap Gap Evolution to fastest:" ${referenceDriverYear}`);
+    // Scales
+    const xExtent = d3.extent(allPoints, (d) => d.x) as [number, number];
+    const yExtent = d3.extent(allPoints, (d) => d.y) as [number, number];
 
-        // Scales
-        const xExtent = d3.extent(allPoints, (d) => d.x) as [number, number];
-        const yExtent = d3.extent(allPoints, (d) => d.y) as [number, number];
+    const xScale = d3.scaleLinear().domain(xExtent).range([0, innerWidth]);
+    const yScale = d3
+      .scaleLinear()
+      .domain([yExtent[0], yExtent[1]])
+      .range([innerHeight, 0]);
 
-        const xScale = d3.scaleLinear().domain(xExtent).range([0, innerWidth]);
-        const yScale = d3.scaleLinear().domain([yExtent[0], yExtent[1]]).range([innerHeight, 0]);
+    // Axes
+    g.append("g")
+      .attr("transform", `translate(0,${innerHeight})`)
+      .call(d3.axisBottom(xScale))
+      .append("text")
+      .style("font-size", "14px")
+      .style("font-weight", "bold")
+      .attr("x", innerWidth / 2)
+      .attr("y", 40)
+      .attr("fill", "white")
+      .attr("text-anchor", "middle")
+      .text("Track Distance (m)");
 
-        // Axes
-        g.append("g")
-            .attr("transform", `translate(0,${innerHeight})`)
-            .call(d3.axisBottom(xScale))
-            .append("text")
-            .style("font-size", "14px")
-            .style("font-weight", "bold")
-            .attr("x", innerWidth / 2)
-            .attr("y", 40)
-            .attr("fill", "white")
-            .attr("text-anchor", "middle")
-            .text("Track Distance (m)");
+    g.append("g")
+      .call(d3.axisLeft(yScale))
+      .append("text")
+      .style("font-size", "14px")
+      .style("font-weight", "bold")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -innerHeight / 2)
+      .attr("y", -45)
+      .attr("fill", "white")
+      .attr("text-anchor", "middle")
+      .text("Time Difference (s)");
 
-        g.append("g")
-            .call(d3.axisLeft(yScale))
-            .append("text")
-            .style("font-size", "14px")
-            .style("font-weight", "bold")
-            .attr("transform", "rotate(-90)")
-            .attr("x", -innerHeight / 2)
-            .attr("y", -45)
-            .attr("fill", "white")
-            .attr("text-anchor", "middle")
-            .text("Time Difference (s)");
+    // Draw reference driver as horizontal line y=0
+    g.append("line")
+      .attr("x1", 0)
+      .attr("y1", yScale(0))
+      .attr("x2", innerWidth)
+      .attr("y2", yScale(0))
+      .attr("stroke", "white")
+      .attr("stroke-dasharray", "5,5")
+      .attr("stroke-width", 2);
 
-        // Draw reference driver as horizontal line y=0
-        g.append("line")
-            .attr("x1", 0)
-            .attr("y1", yScale(0))
-            .attr("x2", innerWidth)
-            .attr("y2", yScale(0))
-            .attr("stroke", "white")
-            .attr("stroke-dasharray", "5,5")
-            .attr("stroke-width", 2);
+    // Line generator
+    const line = d3
+      .line<LapGapEvolutionPoint>()
+      .x((d) => xScale(d.x))
+      .y((d) => yScale(d.y));
 
-        // Line generator
-        const line = d3
-            .line<LapGapEvolutionPoint>()
-            .x((d) => xScale(d.x))
-            .y((d) => yScale(d.y));
+    const colorScale = (fastest: string) => getDriverYearColor(fastest, driverColorMap, sessionYears);
 
-        // Draw non-reference driver-year lines
-        drivers.forEach((driverKey, i) => {
-            if (driverKey === referenceDriverYear) return;
+    // Draw non-reference driver-year lines
+    drivers.forEach((driverKey, i) => {
+      if (driverKey === referenceDriverYear) return;
 
-            g.append("path")
-                .datum(data[driverKey])
-                .attr("fill", "none")
-                .attr("stroke", d3.schemeCategory10[i % 10])
-                .attr("stroke-width", 2)
-                .attr("d", line);
-        });
+      g.append("path")
+        .datum(data[driverKey])
+        .attr("fill", "none")
+        .attr("stroke", () => {
+          const key = driverKey.replace(" ", "_");
+          return colorScale(key);
+        })
+        .attr("stroke-width", 2)
+        .attr("d", line);
+    });
+  }, [data]);
 
-        // Legend
-        const legend = svg.append("g").attr("transform", `translate(${innerWidth + margin.left + 10}, ${margin.top})`);
-        drivers.forEach((driver, i) => {
-            const gLegend = legend.append("g").attr("transform", `translate(0, ${i * 20})`);
-            gLegend.append("rect")
-                .attr("width", 12)
-                .attr("height", 12)
-                .attr("fill", "white")
-                .attr("fill", d3.schemeCategory10[i % 10]);
-
-            gLegend.append("text")
-                .attr("x", 16)
-                .attr("y", 10)
-                .attr("fill", "white")
-                .text(driver);
-        });
-    }, [data]);
-
-    return <svg ref={svgRef} width={700} height={350}></svg>;
+  return <svg ref={svgRef} width={700} height={350}></svg>;
 };
