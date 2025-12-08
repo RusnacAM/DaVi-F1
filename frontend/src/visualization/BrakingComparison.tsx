@@ -163,57 +163,6 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
       .attr("font-size", 14)
       .attr("fill", "white")
       .attr("font-weight", "bold");
-
-    // Tooltip
-    const tooltip = d3.select(container).append("div")
-      .style("position", "fixed")
-      .style("pointer-events", "none")
-      .style("padding", "8px 10px")
-      .style("background", "rgba(255,255,255,0.95)")
-      .style("border", "1px solid #ccc")
-      .style("border-radius", "4px")
-      .style("font-size", "12px")
-      .style("color", "black")
-      .style("display", "none");
-
-    const overlay = g.append("rect")
-      .attr("width", innerW)
-      .attr("height", innerH)
-      .style("fill", "none")
-      .style("pointer-events", "all");
-
-    const bisect = d3.bisector<BrakingPoint, number>(d => d.distance).left;
-
-    overlay.on("mousemove", function (event) {
-      const pointer = d3.pointer(event);
-      const xm = x.invert(pointer[0]);
-      
-      let tooltipHtml = `<div><strong>Distance:</strong> ${xm.toFixed(1)} m</div>`;
-      
-      // Check ideal
-      const idealIdx = bisect(firstData, xm);
-      const idealPoint = firstData[idealIdx];
-      if (idealPoint) {
-        tooltipHtml += `<div><strong>Ideal:</strong> ${idealPoint.ideal_brake >= 0.5 ? "Braking" : "Not braking"}</div>`;
-      }
-      
-      // Check each driver
-      driverYearKeys.forEach(key => {
-        const dataset = data[key];
-        const i = Math.max(0, Math.min(dataset.length - 1, bisect(dataset, xm)));
-        const d = dataset[i];
-        if (d) {
-          tooltipHtml += `<div><strong>${key}:</strong> ${d.driver_brake >= 0.5 ? "Braking" : "Not braking"}</div>`;
-        }
-      });
-
-      tooltip.style("display", "block")
-        .style("left", `${event.clientX + 12}px`)
-        .style("top", `${event.clientY - 28}px`)
-        .html(tooltipHtml);
-    }).on("mouseleave", function () {
-      tooltip.style("display", "none");
-    });
   }, [data, width]);
 
   return <div ref={containerRef} style={{ width: "100%", position: "relative" }} />;

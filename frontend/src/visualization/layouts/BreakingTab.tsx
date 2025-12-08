@@ -120,7 +120,7 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
 
     {/* Braking Distribution Box Plot */}
     <section style={{ width: "60%", margin: "0 auto" }}>
-      <h3 style={{ color: "white", marginBottom: "10px" }}>Braking Distribution</h3>
+      <h3 style={{ color: "white", marginBottom: "10px" }}>Braking Distance Distribution</h3>
 
       {loadingState ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
