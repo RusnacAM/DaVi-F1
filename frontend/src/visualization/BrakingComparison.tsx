@@ -29,7 +29,7 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
     const driverYearKeys = Object.keys(data);
     const rowHeight = 40;
     const height = 100 + (driverYearKeys.length + 1) * rowHeight; // +1 for ideal
-    const margin = { top: 60, right: 40, bottom: 50, left: 120 };
+    const margin = { top: 60, right: 40, bottom: 50, left: 80 };
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
@@ -145,6 +145,7 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
       .attr("y", innerH + 40)
       .attr("fill", "white")
       .attr("text-anchor", "middle")
+      .style("font-size", "12px")
       .text("Distance along lap [m]");
 
     // Y-axis (left) - driver labels
@@ -159,7 +160,6 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
     legend.append("text")
       .attr("x", 0)
       .attr("y", 0)
-      .text("Braking Periods")
       .attr("font-size", 14)
       .attr("fill", "white")
       .attr("font-weight", "bold");
