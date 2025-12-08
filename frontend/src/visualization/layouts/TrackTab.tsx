@@ -72,7 +72,6 @@ export const TrackTab: React.FC<TrackTabProps> = ({
       setData(response);
       setDataAvgDiffs(responseAvgDiffs);
       setDataLapGapEvolution(responseLapGapEvolution);
-      console.log(responseLapGapEvolution);
     } catch (error) {
       setLoadingState(false);
       console.error("Error fetching data:", error);
@@ -143,10 +142,14 @@ export const TrackTab: React.FC<TrackTabProps> = ({
 
           <div className="lap-gap-evolution">
             {data_lap_gap_evolution && !loadingState ? (
-              <LapGapEvolution data={data_lap_gap_evolution} driverColorMap={driverColorMap} sessionYears={sessionYears} />
-            ) : (
-              <CircularProgress size={50} color="primary" />
-            )}
+            <LapGapEvolution
+              data={data_lap_gap_evolution}
+              sessionYears={sessionYears}
+              driverColorMap={driverColorMap}
+            />
+          ) : (
+            <CircularProgress size={50} color="primary" />
+          )}
           </div>
         </div>
       </div>
