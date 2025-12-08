@@ -16,6 +16,9 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1200);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const [hoverX, setHoverX] = useState<number | null>(null);
+
 
   // Update width when container resizes
   useEffect(() => {
@@ -40,7 +43,7 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
     svg.selectAll("*").remove();
 
     const height = 300;
-    const margin = { top: 60, right: 40, bottom: 50, left: 60 };
+    const margin = { top: 60, right: 40, bottom: 50, left: 80 };
 
     const allPoints = Object.entries(data).flatMap(([key, points]) =>
       points.map((p) => ({
@@ -142,12 +145,99 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
         .attr("font-size", 11)
         .attr("fill", "white");
     });
+    const updateTooltip = (mouseX: number, dist: number) => {
+      if (!tooltipRef.current) return;
+
+      // For each driver, find the nearest data point by distance
+      const tooltipData = yearDriverKeys.map((key) => {
+        const pts = data[key];
+
+        // find nearest point
+        const nearest = pts.reduce((prev, curr) =>
+          Math.abs(curr.distance - dist) < Math.abs(prev.distance - dist) ? curr : prev
+        );
+
+        return {
+          key,
+          value: nearest?.[metric],
+        };
+      });
+
+      tooltipRef.current.style.display = "block";
+      const svgRect = svgRef.current!.getBoundingClientRect();
+
+      tooltipRef.current.style.left = svgRect.left + mouseX + "px";
+      tooltipRef.current.style.top = svgRect.top + margin.top + "px";
+
+      tooltipRef.current.innerHTML = `
+          <div style="font-weight:bold;margin-bottom:5px">
+            Distance: ${dist.toFixed(1)} m
+          </div>
+          ${tooltipData
+            .map(
+              (t) => `
+              <div>
+                <span style="color:${colorScale(t.key)}">${t.key.replace("_", " ")}</span>:
+                <b>${t.value?.toFixed(2)}</b>
+              </div>
+            `
+            )
+            .join("")}
+        `;
+    };
+
+    const hoverLine = svg.append("line")
+      .attr("stroke", "white")
+      .attr("stroke-width", 1)
+      .attr("y1", margin.top)
+      .attr("y2", height - margin.bottom)
+      .style("opacity", 0);
+
+    // Transparent overlay to capture mouse events
+    svg.append("rect")
+      .attr("x", margin.left)
+      .attr("y", margin.top)
+      .attr("width", width - margin.left - margin.right)
+      .attr("height", height - margin.top - margin.bottom)
+      .attr("fill", "transparent")
+      .on("mousemove", (event) => {
+        const [mouseX] = d3.pointer(event);
+        const dist = xScale.invert(mouseX);
+
+        setHoverX(dist);
+
+        hoverLine
+          .attr("x1", mouseX)
+          .attr("x2", mouseX)
+          .style("opacity", 1);
+
+        updateTooltip(mouseX, dist);
+      })
+      .on("mouseleave", () => {
+        hoverLine.style("opacity", 0);
+        if (tooltipRef.current) tooltipRef.current.style.display = "none";
+      });
 
   }, [data, metric, label, width]);
 
   return (
-    <div ref={containerRef} style={{ width: "100%" }}>
+    <div ref={containerRef} style={{ width: "100%", position: "relative" }}>
       <svg ref={svgRef} width={width} height={300}></svg>
+      <div
+        ref={tooltipRef}
+        style={{
+          position: "fixed",
+          pointerEvents: "none",
+          padding: "8px 10px",
+          background: "rgba(0,0,0,0.8)",
+          color: "white",
+          fontSize: "12px",
+          borderRadius: "6px",
+          transform: "translate(-50%, -120%)",
+          display: "none",
+          zIndex: 20,
+        }}
+      />
     </div>
   );
 };

@@ -70,16 +70,17 @@ export default function BrakingDistributionBoxPlot({ data }: Props) {
       .range([height - margin.bottom, margin.top]);
 
     const g = svg.append("g");
-
+    const maxBoxWidth = 100;
+    const boxWidth = Math.min(x.bandwidth(), maxBoxWidth);
     // Boxes
     g.selectAll("rect")
       .data(stats)
       .enter()
       .append("rect")
-      .attr("x", d => x(d.key)!)
+      .attr("x", (d) => x(d.key)! + (x.bandwidth() - boxWidth) / 2)
       .attr("y", d => y(d.q3))
       .attr("height", d => Math.max(1, y(d.q1) - y(d.q3)))
-      .attr("width", x.bandwidth())
+      .attr("width", boxWidth)
       .attr("stroke", "white")
       .attr("fill", "rgba(255,255,255,0.15)");
 
@@ -89,8 +90,8 @@ export default function BrakingDistributionBoxPlot({ data }: Props) {
       .enter()
       .append("line")
       .attr("class", "median")
-      .attr("x1", d => x(d.key)!)
-      .attr("x2", d => x(d.key)! + x.bandwidth())
+      .attr("x1", (d) => x(d.key)! + (x.bandwidth() - boxWidth) / 2)
+      .attr("x2", (d) => x(d.key)! + (x.bandwidth() - boxWidth) / 2 + boxWidth)
       .attr("y1", d => y(d.median))
       .attr("y2", d => y(d.median))
       .attr("stroke", "red")
