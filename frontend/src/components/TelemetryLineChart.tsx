@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TelemetryPoint, TelemetryResponse } from "../api/fetchTelemetry";
 import * as d3 from "d3";
 
@@ -14,79 +14,230 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
   label,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(1200);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const [hoverX, setHoverX] = useState<number | null>(null);
+
+
+  // Update width when container resizes
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
 
   useEffect(() => {
     if (!data) return;
 
-    const drivers = Object.keys(data);
-    if (drivers.length === 0) return;
+    const yearDriverKeys = Object.keys(data);
+    if (yearDriverKeys.length === 0) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const width = 1200;
     const height = 300;
-    const margin = 40;
+    const margin = { top: 60, right: 40, bottom: 50, left: 80 };
 
-    const allPoints = Object.entries(data).flatMap(([driver, points]) =>
+    const allPoints = Object.entries(data).flatMap(([key, points]) =>
       points.map((p) => ({
-        driver,
+        yearDriver: key,
         ...p,
       }))
     );
 
-    const xExtent = d3.extent(allPoints, (d) => d.time) as [number, number];
+    const xExtent = d3.extent(allPoints, (d) => d.distance) as [number, number];
     const yExtent = d3.extent(allPoints, (d) => d[metric]) as [number, number];
 
     const xScale = d3
       .scaleLinear()
       .domain(xExtent)
-      .range([margin, width - margin]);
+      .range([margin.left, width - margin.right]);
     const yScale = d3
       .scaleLinear()
       .domain(yExtent)
-      .range([height - margin, margin]);
+      .range([height - margin.bottom, margin.top]);
 
     const colorScale = d3
       .scaleOrdinal<string>()
-      .domain(drivers)
+      .domain(yearDriverKeys)
       .range(d3.schemeTableau10);
 
     const line = d3
       .line<any>()
-      .x((d) => xScale(d.time))
+      .x((d) => xScale(d.distance))
       .y((d) => yScale(d[metric]));
 
-    drivers.forEach((driver) => {
+    // Draw lines for each year-driver combination
+    yearDriverKeys.forEach((key) => {
       svg
         .append("path")
-        .datum(data[driver])
+        .datum(data[key])
         .attr("fill", "none")
-        .attr("stroke", colorScale(driver)!)
+        .attr("stroke", colorScale(key)!)
         .attr("stroke-width", 2)
         .attr("d", line);
     });
 
+    // X-axis
     svg
       .append("g")
-      .attr("transform", `translate(0, ${height - margin})`)
-      .call(d3.axisBottom(xScale).ticks(5))
+      .attr("transform", `translate(0, ${height - margin.bottom})`)
+      .call(d3.axisBottom(xScale).ticks(10))
       .attr("color", "white");
 
+    // Y-axis
     svg
       .append("g")
-      .attr("transform", `translate(${margin}, 0)`)
+      .attr("transform", `translate(${margin.left}, 0)`)
       .call(d3.axisLeft(yScale).ticks(5))
       .attr("color", "white");
 
+    // X-axis label
     svg
       .append("text")
-      .attr("x", margin)
-      .attr("y", margin / 2)
+      .attr("x", width / 2)
+      .attr("y", height - 10)
       .attr("fill", "white")
-      .style("font-size", "14px")
-      .text(label ?? metric);
-  }, [data, metric]);
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .text("Distance along lap [m]");
 
-  return <svg ref={svgRef} width={1200} height={300}></svg>;
+    // Y-axis label
+    svg
+      .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -(height / 2))
+      .attr("y", 15)
+      .attr("fill", "white")
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .text(label);
+
+    // Legend
+    const legend = svg.append("g").attr("transform", `translate(${margin.left + 10}, 10)`);
+    
+    const itemsPerRow = 4;
+    yearDriverKeys.forEach((key, i) => {
+      const row = Math.floor(i / itemsPerRow);
+      const col = i % itemsPerRow;
+      const xOffset = col * 120;
+      const yOffset = row * 20;
+      
+      legend.append("line")
+        .attr("x1", xOffset)
+        .attr("x2", xOffset + 20)
+        .attr("y1", yOffset + 6)
+        .attr("y2", yOffset + 6)
+        .attr("stroke", colorScale(key))
+        .attr("stroke-width", 2);
+      
+      legend.append("text")
+        .attr("x", xOffset + 25)
+        .attr("y", yOffset + 10)
+        .text(key.replace("_", " "))
+        .attr("font-size", 11)
+        .attr("fill", "white");
+    });
+    const updateTooltip = (mouseX: number, dist: number) => {
+      if (!tooltipRef.current) return;
+
+      // For each driver, find the nearest data point by distance
+      const tooltipData = yearDriverKeys.map((key) => {
+        const pts = data[key];
+
+        // find nearest point
+        const nearest = pts.reduce((prev, curr) =>
+          Math.abs(curr.distance - dist) < Math.abs(prev.distance - dist) ? curr : prev
+        );
+
+        return {
+          key,
+          value: nearest?.[metric],
+        };
+      });
+
+      tooltipRef.current.style.display = "block";
+      const svgRect = svgRef.current!.getBoundingClientRect();
+
+      tooltipRef.current.style.left = svgRect.left + mouseX + "px";
+      tooltipRef.current.style.top = svgRect.top + margin.top + "px";
+
+      tooltipRef.current.innerHTML = `
+          <div style="font-weight:bold;margin-bottom:5px">
+            Distance: ${dist.toFixed(1)} m
+          </div>
+          ${tooltipData
+            .map(
+              (t) => `
+              <div>
+                <span style="color:${colorScale(t.key)}">${t.key.replace("_", " ")}</span>:
+                <b>${t.value?.toFixed(2)}</b>
+              </div>
+            `
+            )
+            .join("")}
+        `;
+    };
+
+    const hoverLine = svg.append("line")
+      .attr("stroke", "white")
+      .attr("stroke-width", 1)
+      .attr("y1", margin.top)
+      .attr("y2", height - margin.bottom)
+      .style("opacity", 0);
+
+    // Transparent overlay to capture mouse events
+    svg.append("rect")
+      .attr("x", margin.left)
+      .attr("y", margin.top)
+      .attr("width", width - margin.left - margin.right)
+      .attr("height", height - margin.top - margin.bottom)
+      .attr("fill", "transparent")
+      .on("mousemove", (event) => {
+        const [mouseX] = d3.pointer(event);
+        const dist = xScale.invert(mouseX);
+
+        setHoverX(dist);
+
+        hoverLine
+          .attr("x1", mouseX)
+          .attr("x2", mouseX)
+          .style("opacity", 1);
+
+        updateTooltip(mouseX, dist);
+      })
+      .on("mouseleave", () => {
+        hoverLine.style("opacity", 0);
+        if (tooltipRef.current) tooltipRef.current.style.display = "none";
+      });
+
+  }, [data, metric, label, width]);
+
+  return (
+    <div ref={containerRef} style={{ width: "100%", position: "relative" }}>
+      <svg ref={svgRef} width={width} height={300}></svg>
+      <div
+        ref={tooltipRef}
+        style={{
+          position: "fixed",
+          pointerEvents: "none",
+          padding: "8px 10px",
+          background: "rgba(0,0,0,0.8)",
+          color: "white",
+          fontSize: "12px",
+          borderRadius: "6px",
+          transform: "translate(-50%, -120%)",
+          display: "none",
+          zIndex: 20,
+        }}
+      />
+    </div>
+  );
 };

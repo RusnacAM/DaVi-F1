@@ -39,3 +39,11 @@
   align-items: center;
 }
 
+.AvgDiffs-Chart {
+  width: 700px;
+  height: 300px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+

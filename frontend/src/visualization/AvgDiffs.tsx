@@ -1,23 +1,23 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { type AvgDiffsPoint } from "../api/fetchAvgDiffs";
+import { getDriverYearColor } from "../utils/configureFilterData";
 
 
 // Set Visualization Dimensions and Margins
-const WIDTH = 650;
-const HEIGHT = 400;
+const WIDTH = 700;
+const HEIGHT = 300;
 const MARGIN = { top: 50, right: 100, bottom: 50, left: 70 }; // Increased Right margin for Legend
 const INNER_W = WIDTH - MARGIN.left - MARGIN.right;
 const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom;
 
-// Set colorscheme
-const COLORS = d3.schemeTableau10;
-
 export interface AvgDiffsChartProps {
   data: AvgDiffsPoint[];
+  driverColorMap: Record<string, string>;
+  sessionYears: string[]
 }
 
-export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data }) => {
+export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorMap, sessionYears }) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -111,7 +111,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data }) => {
 
     const y = d3.scaleLinear().domain([yMin, yMax]).nice().range([INNER_H, 0]);
 
-    const colorScale = d3.scaleOrdinal<string>().domain(activeDrivers).range(COLORS);
+    const colorScale = (fastest: string) => getDriverYearColor(fastest, driverColorMap, sessionYears);
     
     // Map each driver to its sorted list of years (strings)
     const yearsByDriver: Record<string, string[]> = Object.fromEntries(
@@ -145,21 +145,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data }) => {
       .attr("y", (d) => Math.min(y(d.value), baselineY))
       .attr("width", x1.bandwidth())
       .attr("height", (d) => Math.abs(y(d.value) - baselineY))
-      .attr("fill", (d) => {
-        const [drv, yr] = d.key.split("_");
-        // base color per driver from the categorical scale
-        const baseColor = colorScale(drv) as string;
-
-        // convert to HSL and vary saturation & lightness by year index
-        const h = d3.hsl(baseColor);
-        const years = yearsByDriver[drv] ?? [yr];
-        const idx = Math.max(0, years.indexOf(yr));
-        const t = years.length > 1 ? idx / (years.length - 1) : 0.5; // 0..1 across years
-        // saturation: from 0.6 -> 1.0, lightness: from 0.35 -> 0.7 (t controls interpolation)
-        h.s = Math.max(0, Math.min(1, 0.8 + 0.2 * t));
-        h.l = Math.max(0, Math.min(1, 0.5 + 0.2 * t));
-        return h.toString();
-       })
+      .attr("fill", (d) => colorScale(d.key))
 
 
       // tiny tooltip interactions
@@ -214,49 +200,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data }) => {
       .attr("text-anchor", "middle")
       .style("font-weight", "bold")
       .style("fill", "#fff")
-      .text("Time loss (s)");
-
-    // --- 5. Legends ---
-    const legend = svg
-      .append("g")
-      .attr("transform", `translate(${INNER_W + 20}, ${MARGIN.top})`);
-
-    // -> Driver Legend (Colors)
-    legend.append("text").text("Drivers").style("font-weight", "bold").style("fill", "#fff");
-    
-    activeDrivers.forEach((drv, i) => {
-      const yPos = 25 + i * 20;
-      legend.append("rect")
-        .attr("y", yPos).attr("width", 15).attr("height", 15)
-        .attr("fill", colorScale(drv));
-      legend.append("text")
-        .attr("x", 20).attr("y", yPos + 12)
-        .text(drv).style("font-size", "12px").style("fill", "#fff");
-    });
-
-    /* -> Year Legend (no opacity encoding anymore)
-    if (activeYears.length > 0) {
-        const yearStart = 25 + activeDrivers.length * 20 + 20;
-        legend.append("text")
-            .attr("y", yearStart)
-            .text("Years")
-            .style("font-weight", "bold")
-            .style("fill", "#fff");
-
-        activeYears.forEach((yr, i) => {
-            const yPos = yearStart + 25 + i * 20;
-            
-            // Draw a neutral gray box (full opacity)
-            legend.append("rect")
-                .attr("y", yPos).attr("width", 15).attr("height", 15)
-                .attr("fill", "#666")
-                .attr("fill-opacity", 1);
-                
-            legend.append("text")
-                .attr("x", 20).attr("y", yPos + 12)
-                .text(yr).style("font-size", "12px").style("fill", "#fff");
-        });
-    } */
+      .text("Time loss (s)");   
 
     // Title: centered at the top of the SVG, includes baseline info if available
     const titleText = fastestDriverYear

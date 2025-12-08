@@ -1,7 +1,9 @@
 import { apiRequest } from "./api-client";
+import { driverCode } from "../utils/configureFilterData";
 
 export interface TelemetryPoint {
   time: number;
+  distance: number;
   speed: number;
   RPM: number;
   nGear: number;
@@ -11,11 +13,21 @@ export interface TelemetryPoint {
 }
 
 export type TelemetryResponse = {
-  [driverCode: string]: TelemetryPoint[];
+  [yearDriverKey: string]: TelemetryPoint[];  // Keys will be like "2024_VER"
 };
 
-export const fetchTelemetry = async (sessionYear:string, sessionName: string, identifier: string, drivers: string[]): Promise<TelemetryResponse> => {
-    var driversParam = ""
-    drivers.forEach(driver => driversParam += `&drivers=${driver}`)
-    return await apiRequest<TelemetryResponse>(`/telemetry?session_year=${sessionYear}&session_name=${sessionName}&identifier=${identifier}${driversParam}`, 'GET')
+export const fetchTelemetry = async (
+  sessionYears: string[],  // Changed to accept array
+  sessionName: string,
+  identifier: string,
+  drivers: string[]
+): Promise<TelemetryResponse> => {
+  const driverCodes = drivers.map(d => driverCode[d]);
+  const driversParam = driverCodes.map(dc => `&drivers=${dc}`).join("");
+  const yearsParam = sessionYears.join(",");
+  
+  return await apiRequest<TelemetryResponse>(
+    `/telemetry?session_year=${yearsParam}&session_name=${sessionName}&identifier=${identifier}${driversParam}`,
+    "GET"
+  );
 };
