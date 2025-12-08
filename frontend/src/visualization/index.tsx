@@ -6,28 +6,38 @@ import {
   fetchTrackDominance,
   type TrackDominanceResponse,
 } from "../api/fetchTrackDominance";
-import areaChart from "../../public/images/area_chart.jpeg";
 import barChart from "../../public/images/bar_chart.jpeg";
 import { CircularProgress } from "@mui/material";
 import { TrackDominance } from "./TrackDominance";
+import { LapGapEvolution } from "./LapGapEvolution";
+import { fetchLapGapEvolution, type LapGapEvolutionResponse } from "../api/fetchLapGapEvolution";
 
 export const Visualization = () => {
   const { sessionYears, sessionName, sessionIdentifier, driverNames } =
     useFilterConfigs();
 
-  const [data, setData] = useState<TrackDominanceResponse>([]);
+  const [data_track_dominance, setDataTrackDominance] = useState<TrackDominanceResponse>([]);
+  const [data_lap_gap_evolution, setDataLapGapEvolution] = useState<LapGapEvolutionResponse>([]);
   const [loadingState, setLoadingState] = useState(false);
 
   const fetchData = async () => {
     try {
       setLoadingState(true);
-      const response = await fetchTrackDominance(
+      const responseTrackDominance = await fetchTrackDominance(
         sessionName,
         sessionIdentifier,
         driverNames,
         sessionYears
       );
-      setData(response);
+      setDataTrackDominance(responseTrackDominance);
+
+      const responseLapGapEvolution = await fetchLapGapEvolution(
+        sessionName,
+        sessionIdentifier,
+        driverNames,
+        sessionYears
+      );
+      setDataLapGapEvolution(responseLapGapEvolution);
     } catch (error) {
       setLoadingState(false);
       console.error("Error fetching data:", error);
@@ -37,7 +47,7 @@ export const Visualization = () => {
   };
 
   useEffect(() => {
-    if (data.length === 0) fetchData();
+    if (data_track_dominance.length === 0) fetchData();
   }, []);
 
   return (
@@ -48,9 +58,9 @@ export const Visualization = () => {
 
       <div className="chart-container">
         <div className="track-map">
-          {data && !loadingState ? (
+          {data_track_dominance && !loadingState ? (
             <TrackDominance
-              data={data}
+              data={data_track_dominance}
               driverNames={driverNames}
               sessionYears={sessionYears}
             />
@@ -59,7 +69,15 @@ export const Visualization = () => {
           )}
         </div>
         <div className="supporting-chart">
-          <img src={areaChart} alt="Logo" width={700} height={300} />
+          <div className="lap-gap-evolution">
+            {data_lap_gap_evolution && !loadingState ? (
+            <LapGapEvolution
+              data={data_lap_gap_evolution}
+            />
+          ) : (
+            <CircularProgress size={50} color="primary" />
+          )}
+          </div>
           <img src={barChart} alt="Logo" width={700} height={300} />
         </div>
       </div>
