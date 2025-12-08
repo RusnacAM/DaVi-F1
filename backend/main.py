@@ -6,7 +6,7 @@ import numpy as np
 import os
 import math
 
-from utils.sectors import sector_dict
+from utils.sectors import sector_dict, label_dict, labels_spanish, labels_bahrain, labels_austria, labels_italy, labels_britian, labels_abuDhabi
 from typing import List
 from functools import lru_cache
 
@@ -143,7 +143,7 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
     return result.to_dict(orient="records")
 
 
-@app.get("/api/v1/average-loss-to-fastest")
+@app.get("/api/v1/Avg-Diffs")
 def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
     telemetry_list = []
     
