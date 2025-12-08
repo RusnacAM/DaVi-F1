@@ -40,7 +40,7 @@ export const Visualization = () => {
 
   const [data, setData] = useState<TrackDominanceResponse>([]);
   const [telemetryData, setTelemetryData] = useState<TelemetryResponse | null>(null);
-  const [brakingData, setBrakingData] = useState<BrakingPoint[] | null>(null);
+  const [brakingData, setBrakingData] = useState<Record<string, BrakingPoint[]> | null>(null);
   const [activeTab, setActiveTab] = useState<"dominance" | "braking">("dominance");
   const [loadingState, setLoadingState] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -57,18 +57,17 @@ export const Visualization = () => {
       );
       setData(response);
 
-      const mainDriver = driverNames[0];
       const brakingResp = await fetchBrakingComparison(
-        sessionYears[0],
+        sessionYears, 
         sessionName,
         sessionIdentifiers[0],
-        mainDriver
+        driverNames   
       );
 
-      setBrakingData(brakingResp && brakingResp.length ? brakingResp : null);
+      setBrakingData(brakingResp && Object.keys(brakingResp).length ? brakingResp : null);
 
       const telemetryResp = await fetchTelemetry(
-        sessionYears[0],
+        sessionYears,
         sessionName,
         sessionIdentifiers[0],
         driverNames
@@ -80,7 +79,7 @@ export const Visualization = () => {
           : null
       );
       const brakingDistResp = await fetchBrakingDistribution(
-        sessionYears[0],
+        sessionYears,
         sessionName,
         sessionIdentifiers[0],
         driverNames
@@ -246,10 +245,7 @@ export const Visualization = () => {
                 )}
 
                 {!loadingState && brakingData && (
-                  <BrakingComparison 
-                    data={brakingData}
-                    driverName={driverNames[0]}
-                  />
+                  <BrakingComparison data={brakingData} />
                 )}
 
                 {!loadingState && !brakingData && (

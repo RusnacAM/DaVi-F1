@@ -1,30 +1,36 @@
 import { apiRequest } from "./api-client";
-import { driverCode, identifierMap } from "../utils/configureFilterData";
+import { driverCode } from "../utils/configureFilterData";
 
 export interface BrakingPoint {
   distance: number;
   ideal_brake: number;
   driver_brake: number;
+  driver?: string;
+  year?: number;
 }
 
-export type BrakingComparisonResponse = BrakingPoint[];
+// Response is now a dictionary of driver_year -> BrakingPoint[]
+export type BrakingComparisonResponse = Record<string, BrakingPoint[]>;
 
 export const fetchBrakingComparison = async (
-  sessionYear: string,
+  sessionYears: string[],
   sessionName: string,
   identifier: string,
-  driverName: string
+  driverNames: string[]
 ): Promise<BrakingComparisonResponse> => {
 
-  const code = driverCode[driverName];
+  const codes = driverNames.map(name => driverCode[name]).filter(Boolean);
 
-  if (!code) {
-    console.error("Driver name not found in driverCode map:", driverName);
-    return [];
+  if (codes.length === 0) {
+    console.error("No valid driver codes found");
+    return {};
   }
 
+  const yearsParam = sessionYears.join(",");
+  const driversParam = codes.join(",");
+
   return await apiRequest<BrakingComparisonResponse>(
-    `/braking-comparison?session_year=${sessionYear}&session_name=${sessionName}&identifier=${identifierMap[identifier]}&driver=${code}`,
+    `/braking-comparison?session_year=${yearsParam}&session_name=${sessionName}&identifier=${identifier}&drivers=${driversParam}`,
     "GET"
   );
 };

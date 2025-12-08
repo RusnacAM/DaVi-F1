@@ -13,20 +13,21 @@ export interface TelemetryPoint {
 }
 
 export type TelemetryResponse = {
-  [driverCode: string]: TelemetryPoint[];
+  [yearDriverKey: string]: TelemetryPoint[];  // Keys will be like "2024_VER"
 };
 
 export const fetchTelemetry = async (
-  sessionYear: string,
+  sessionYears: string[],  // Changed to accept array
   sessionName: string,
   identifier: string,
   drivers: string[]
 ): Promise<TelemetryResponse> => {
   const driverCodes = drivers.map(d => driverCode[d]);
   const driversParam = driverCodes.map(dc => `&drivers=${dc}`).join("");
+  const yearsParam = sessionYears.join(",");
   
   return await apiRequest<TelemetryResponse>(
-    `/telemetry?session_year=${sessionYear}&session_name=${sessionName}&identifier=${identifier}${driversParam}`,
+    `/telemetry?session_year=${yearsParam}&session_name=${sessionName}&identifier=${identifier}${driversParam}`,
     "GET"
   );
 };

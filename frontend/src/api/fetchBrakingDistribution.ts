@@ -4,11 +4,12 @@ import { driverCode } from "../utils/configureFilterData";
 export interface BrakingDistributionPoint {
   braking_distance: number;
   driver: string;
+  year: number;
   lap: number;
 }
 
 export const fetchBrakingDistribution = async (
-  sessionYear: string,
+  sessionYears: string[],  // Changed to accept array
   sessionName: string,
   identifier: string,
   drivers: string[]
@@ -20,8 +21,10 @@ export const fetchBrakingDistribution = async (
     driversParam += `&drivers=${code}`;
   });
 
+  const yearsParam = sessionYears.join(",");
+
   const resp = await apiRequest<{ data: BrakingDistributionPoint[] }>(
-    `/braking-distribution?session_year=${sessionYear}&session_name=${sessionName}&identifier=${identifier}${driversParam}`,
+    `/braking-distribution?session_year=${yearsParam}&session_name=${sessionName}&identifier=${identifier}${driversParam}`,
     "GET"
   );
   return resp.data;
