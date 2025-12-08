@@ -16,17 +16,32 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const codeToDriver = Object.fromEntries(
-    Object.entries(driverCode).map(([name, code]) => [code, name])
+  const codeToDriver = Object.fromEntries(Object.entries(driverCode).map(([name, code]) => [code, name]));
+  const driverCodes = driverNames.map((d) => driverCode[d]);
+  const fastestList = driverCodes.flatMap((code) =>
+    sessionYears.map((year) => `${code}_${year}`)
   );
+
+  const baseColors = d3.schemeTableau10;
+  const driverColorMap: Record<string, string> = {};
+  driverCodes.forEach((code, i) => {
+    driverColorMap[code] = baseColors[i % baseColors.length];
+  });
+
+  function getDriverYearColor(driverYear: string): string {
+      const [code, year] = driverYear.split("_");
+      const baseColor = d3.color(driverColorMap[code])!;
+      const yearIndex = sessionYears.indexOf(year);
+
+      if (yearIndex === 1) {
+        return d3.color(baseColor.brighter(1.1))!.formatRgb();
+      }
+
+      return baseColor.formatRgb();
+    }
 
   useEffect(() => {
     if (!data) return;
-    const driverCodes = driverNames.map((d) => driverCode[d]);
-    const fastestList = driverCodes.flatMap((code) =>
-      sessionYears.map((year) => `${code}_${year}`)
-    );
-
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
@@ -54,10 +69,12 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
       .domain(yExtent)
       .range([height - margin, margin]);
 
-    const colorScale = d3
-      .scaleOrdinal<string>()
-      .domain(fastestList)
-      .range(d3.schemeTableau10);
+    // const colorScale = d3
+    //   .scaleOrdinal<string>()
+    //   .domain(fastestList)
+    //   .range(d3.schemeTableau10);
+
+    const colorScale = (fastest: string) => getDriverYearColor(fastest);
 
     const startPoint = data[0];
     const sectors = d3.group(data, (d) => d.minisector);
@@ -97,7 +114,7 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
               `
               Minisector: ${points[0].minisector}<br>
               Driver: ${codeToDriver[points[0].fastest.split("_")[0]]}<br>
-              Year: ${points[0].year}
+              Year: ${points[0].fastest.split("_")[1]}
               `
             )
             .style("opacity", 1)
