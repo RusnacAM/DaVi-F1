@@ -1,24 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import type { TelemetryPoint, TelemetryResponse } from "../api/fetchTelemetry";
 import * as d3 from "d3";
+import { getDriverYearColor } from "../utils/configureFilterData";
 
 interface TelemetryLineChartProps {
   data: TelemetryResponse;
   metric: keyof TelemetryPoint;
   label: string;
+  driverColorMap: Record<string, string>;
+  sessionYears: string[];
 }
 
 export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
   data,
   metric,
   label,
+  driverColorMap,
+  sessionYears,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1200);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [hoverX, setHoverX] = useState<number | null>(null);
-
 
   // Update width when container resizes
   useEffect(() => {
@@ -64,10 +68,11 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
       .domain(yExtent)
       .range([height - margin.bottom, margin.top]);
 
-    const colorScale = d3
-      .scaleOrdinal<string>()
-      .domain(yearDriverKeys)
-      .range(d3.schemeTableau10);
+    const normalizeKey = (key: string) => {
+      const [year, driver] = key.split("_");
+      return `${driver}_${year}`;
+    };
+    const colorScale = (key: string) => getDriverYearColor(normalizeKey(key), driverColorMap, sessionYears);
 
     const line = d3
       .line<any>()
@@ -121,24 +126,28 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
       .text(label);
 
     // Legend
-    const legend = svg.append("g").attr("transform", `translate(${margin.left + 10}, 10)`);
-    
+    const legend = svg
+      .append("g")
+      .attr("transform", `translate(${margin.left + 10}, 10)`);
+
     const itemsPerRow = 4;
     yearDriverKeys.forEach((key, i) => {
       const row = Math.floor(i / itemsPerRow);
       const col = i % itemsPerRow;
       const xOffset = col * 120;
       const yOffset = row * 20;
-      
-      legend.append("line")
+
+      legend
+        .append("line")
         .attr("x1", xOffset)
         .attr("x2", xOffset + 20)
         .attr("y1", yOffset + 6)
         .attr("y2", yOffset + 6)
         .attr("stroke", colorScale(key))
         .attr("stroke-width", 2);
-      
-      legend.append("text")
+
+      legend
+        .append("text")
         .attr("x", xOffset + 25)
         .attr("y", yOffset + 10)
         .text(key.replace("_", " "))
@@ -154,7 +163,9 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
 
         // find nearest point
         const nearest = pts.reduce((prev, curr) =>
-          Math.abs(curr.distance - dist) < Math.abs(prev.distance - dist) ? curr : prev
+          Math.abs(curr.distance - dist) < Math.abs(prev.distance - dist)
+            ? curr
+            : prev
         );
 
         return {
@@ -177,7 +188,10 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
             .map(
               (t) => `
               <div>
-                <span style="color:${colorScale(t.key)}">${t.key.replace("_", " ")}</span>:
+                <span style="color:${colorScale(t.key)}">${t.key.replace(
+                "_",
+                " "
+              )}</span>:
                 <b>${t.value?.toFixed(2)}</b>
               </div>
             `
@@ -186,7 +200,8 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
         `;
     };
 
-    const hoverLine = svg.append("line")
+    const hoverLine = svg
+      .append("line")
       .attr("stroke", "white")
       .attr("stroke-width", 1)
       .attr("y1", margin.top)
@@ -194,7 +209,8 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
       .style("opacity", 0);
 
     // Transparent overlay to capture mouse events
-    svg.append("rect")
+    svg
+      .append("rect")
       .attr("x", margin.left)
       .attr("y", margin.top)
       .attr("width", width - margin.left - margin.right)
@@ -206,10 +222,7 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
 
         setHoverX(dist);
 
-        hoverLine
-          .attr("x1", mouseX)
-          .attr("x2", mouseX)
-          .style("opacity", 1);
+        hoverLine.attr("x1", mouseX).attr("x2", mouseX).style("opacity", 1);
 
         updateTooltip(mouseX, dist);
       })
@@ -217,7 +230,6 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
         hoverLine.style("opacity", 0);
         if (tooltipRef.current) tooltipRef.current.style.display = "none";
       });
-
   }, [data, metric, label, width]);
 
   return (

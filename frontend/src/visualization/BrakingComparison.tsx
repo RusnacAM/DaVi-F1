@@ -1,12 +1,19 @@
 import React, { useRef, useEffect, useState } from "react";
 import * as d3 from "d3";
 import type { BrakingPoint } from "../api/fetchBrakingComparison";
+import { getDriverYearColor } from "../utils/configureFilterData";
 
 type Props = {
   data: Record<string, BrakingPoint[]>;
+  driverColorMap: Record<string, string>;
+  sessionYears: string[];
 };
 
-export const BrakingComparison: React.FC<Props> = ({ data }) => {
+export const BrakingComparison: React.FC<Props> = ({
+  data,
+  driverColorMap,
+  sessionYears,
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(1200);
 
@@ -23,8 +30,9 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
   }, []);
 
   useEffect(() => {
-    if (!data || Object.keys(data).length === 0 || !containerRef.current) return;
-    
+    if (!data || Object.keys(data).length === 0 || !containerRef.current)
+      return;
+
     const container = containerRef.current;
     const driverYearKeys = Object.keys(data);
     const rowHeight = 40;
@@ -48,27 +56,25 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
 
     const firstKey = Object.keys(data)[0];
     const firstData = data[firstKey];
-    
+
     const x = d3
       .scaleLinear()
       .domain(d3.extent(firstData, (d) => d.distance) as [number, number])
       .range([0, innerW]);
 
     const allKeys = ["ideal", ...driverYearKeys];
-    const y = d3
-      .scaleBand()
-      .domain(allKeys)
-      .range([0, innerH])
-      .padding(0.2);
+    const y = d3.scaleBand().domain(allKeys).range([0, innerH]).padding(0.2);
 
     // Color scale
-    const colorScale = d3
-      .scaleOrdinal<string>()
-      .domain(allKeys)
-      .range(["#ff0000", ...d3.schemeTableau10]);
+    const colorScale = (key: string) => {
+      if (key === "ideal") return "#ff0000";
+      const [year, code] = key.split("_");
+      const normalized = `${code}_${year}`;
+      return getDriverYearColor(normalized, driverColorMap, sessionYears);
+    };
 
     // Draw horizontal grid lines
-    allKeys.forEach(key => {
+    allKeys.forEach((key) => {
       g.append("line")
         .attr("x1", 0)
         .attr("x2", innerW)
@@ -79,14 +85,17 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
     });
 
     // Helper function to find braking segments
-    const findBrakingSegments = (points: BrakingPoint[], brakeKey: "ideal_brake" | "driver_brake") => {
+    const findBrakingSegments = (
+      points: BrakingPoint[],
+      brakeKey: "ideal_brake" | "driver_brake"
+    ) => {
       const segments: Array<{ start: number; end: number }> = [];
       let inSegment = false;
       let segmentStart = 0;
 
       for (let i = 0; i < points.length; i++) {
         const isBraking = points[i][brakeKey] > 0;
-        
+
         if (isBraking && !inSegment) {
           // Start new segment
           segmentStart = points[i].distance;
@@ -97,18 +106,21 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
           inSegment = false;
         }
       }
-      
+
       // Close last segment if still braking at end
       if (inSegment) {
-        segments.push({ start: segmentStart, end: points[points.length - 1].distance });
+        segments.push({
+          start: segmentStart,
+          end: points[points.length - 1].distance,
+        });
       }
-      
+
       return segments;
     };
 
     // Draw ideal brake segments
     const idealSegments = findBrakingSegments(firstData, "ideal_brake");
-    idealSegments.forEach(segment => {
+    idealSegments.forEach((segment) => {
       g.append("rect")
         .attr("x", x(segment.start))
         .attr("y", y("ideal")!)
@@ -119,10 +131,10 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
     });
 
     // Draw each driver's brake segments
-    driverYearKeys.forEach(key => {
+    driverYearKeys.forEach((key) => {
       const segments = findBrakingSegments(data[key], "driver_brake");
-      
-      segments.forEach(segment => {
+
+      segments.forEach((segment) => {
         g.append("rect")
           .attr("x", x(segment.start))
           .attr("y", y(key)!)
@@ -150,14 +162,23 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
 
     // Y-axis (left) - driver labels
     g.append("g")
-      .call(d3.axisLeft(y).tickFormat(d => d === "ideal" ? "Ideal Lap" : d.replace("_", " ")))
+      .call(
+        d3
+          .axisLeft(y)
+          .tickFormat((d) =>
+            d === "ideal" ? "Ideal Lap" : d.replace("_", " ")
+          )
+      )
       .selectAll("text")
       .attr("fill", "white")
       .attr("font-size", 11);
 
     // Legend (optional, since labels are on y-axis)
-    const legend = svg.append("g").attr("transform", `translate(${margin.left + 10},${10})`);
-    legend.append("text")
+    const legend = svg
+      .append("g")
+      .attr("transform", `translate(${margin.left + 10},${10})`);
+    legend
+      .append("text")
       .attr("x", 0)
       .attr("y", 0)
       .attr("font-size", 14)
@@ -165,5 +186,7 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
       .attr("font-weight", "bold");
   }, [data, width]);
 
-  return <div ref={containerRef} style={{ width: "100%", position: "relative" }} />;
+  return (
+    <div ref={containerRef} style={{ width: "100%", position: "relative" }} />
+  );
 };

@@ -34,11 +34,11 @@ export const driverCode: Record<string, string> = Object.values(DRIVERS)
     return acc;
   }, {} as Record<string, string>);
 
-export const getDriverYearColor = (
+export function getDriverYearColor(
   driverYear: string,
   driverColorMap: Record<string, string>,
   sessionYears: string[]
-): string => {
+): string {
   const [code, year] = driverYear.split("_");
   const baseColor = d3.color(driverColorMap[code])!;
   const yearIndex = sessionYears.indexOf(year);
@@ -48,4 +48,4 @@ export const getDriverYearColor = (
   }
 
   return baseColor.formatRgb();
-};
+}
