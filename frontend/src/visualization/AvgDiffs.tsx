@@ -59,7 +59,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
         .reduce((sum, curr) => sum + curr.Diff_to_Fastest_sec, 0);
       return { dy, totalDiff };
     });
-    
+
     // Sort ascending (lowest diff first) and pick the first one
     const fastestEntry = sums.sort((a, b) => a.totalDiff - b.totalDiff)[0];
     const fastestDriverYear = fastestEntry ? fastestEntry.dy : "";
@@ -79,8 +79,8 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
       activeDriverYears.forEach((dy) => {
         // Case-insensitive check for label
         const found = data.find(
-          (d) => 
-            d.DriverYear === dy && 
+          (d) =>
+            d.DriverYear === dy &&
             d.MinisectorLabel.toLowerCase() === sector.toLowerCase()
         );
         row[dy] = found ? Number(found.Diff_to_Fastest_sec) : 0;
@@ -112,7 +112,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
     const y = d3.scaleLinear().domain([yMin, yMax]).nice().range([INNER_H, 0]);
 
     const colorScale = (fastest: string) => getDriverYearColor(fastest, driverColorMap, sessionYears);
-    
+
     // Map each driver to its sorted list of years (strings)
     const yearsByDriver: Record<string, string[]> = Object.fromEntries(
       activeDrivers.map((drv) => {
@@ -123,7 +123,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
         return [drv, yrs];
       })
     );
-    
+
     // determine baseline Y (clamped to chart area)
     const baselineY = Math.max(0, Math.min(INNER_H, y(0)));
 
@@ -200,30 +200,40 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
       .attr("text-anchor", "middle")
       .style("font-weight", "bold")
       .style("fill", "#fff")
-      .text("Time loss (s)");   
+      .text("Time loss (s)");
 
     // Title: centered at the top of the SVG, includes baseline info if available
     const titleText = fastestDriverYear
-      ? `Average time loss to fastest driver: ${fastestDriverYear.split("_")[0]} (${fastestDriverYear.split("_")[1]})`
-      : "Avg Time Loss to Fastest";
+      ? [
+        `Fastest driver: ${fastestDriverYear.split("_")[0]} (${fastestDriverYear.split("_")[1]})`,
+        "Average time loss to fastest driver"
+      ]
+      : ["Avg Time Loss to Fastest"];
 
-    svg.append("text")
+    const title = svg.append("text")
       .attr("x", MARGIN.left + INNER_W / 2)
       .attr("y", MARGIN.top / 2)
       .attr("text-anchor", "middle")
       .style("font-size", "16px")
       .style("font-weight", "600")
-      .style("fill", "#fff")
-      .text(titleText);
+      .style("fill", "#fff");
+
+    // Create each line as a <tspan>
+    titleText.forEach((line, i) => {
+      title.append("tspan")
+        .attr("x", MARGIN.left + INNER_W / 2)
+        .attr("dy", i === 0 ? 0 : 18)   // ~18px spacing per line
+        .text(line);
+    });
 
   }, [data]);
 
   return (
     <div style={{ overflowX: "auto" }}>
-      <svg 
-        ref={svgRef} 
-        width={WIDTH} 
-        height={HEIGHT} 
+      <svg
+        ref={svgRef}
+        width={WIDTH}
+        height={HEIGHT}
         style={{ maxWidth: "100%", height: "auto" }}
       ></svg>
     </div>

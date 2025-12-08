@@ -129,7 +129,8 @@ export default function BrakingDistributionBoxPlot({ data }: Props) {
       .attr("transform", "rotate(-45)")
       .style("text-anchor", "end")
       .attr("dx", "-0.5em")
-      .attr("dy", "0.15em");
+      .attr("dy", "0.15em")
+      .text(d => String(d).replace("_", " "));
 
     svg.append("g")
       .attr("transform", `translate(${margin.left},0)`)
@@ -153,7 +154,6 @@ export default function BrakingDistributionBoxPlot({ data }: Props) {
       .attr("y", 24)
       .attr("text-anchor", "middle")
       .attr("fill", "white")
-      .text("Braking Distance Distribution");
   }, [data, dimensions]);
 
   return (
