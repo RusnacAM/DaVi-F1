@@ -237,7 +237,7 @@ export const Visualization = () => {
             <div style={{ width: "60%", minWidth: 0, flex: "0 0 60%", overflow: "auto", maxHeight: "100vh" }}>
               <section style={{ marginTop: 20 }}>
                 <h3 style={{ color: "white" }}>
-                  Braking Comparison — Ideal Lap vs {driverNames[0]}
+                  Braking Comparison
                 </h3>
 
                 {loadingState && (

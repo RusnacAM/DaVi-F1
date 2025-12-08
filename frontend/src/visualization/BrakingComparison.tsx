@@ -3,7 +3,7 @@ import * as d3 from "d3";
 import type { BrakingPoint } from "../api/fetchBrakingComparison";
 
 type Props = {
-  data: Record<string, BrakingPoint[]>;  // Changed from BrakingPoint[]
+  data: Record<string, BrakingPoint[]>;
 };
 
 export const BrakingComparison: React.FC<Props> = ({ data }) => {
@@ -26,8 +26,10 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
     if (!data || Object.keys(data).length === 0 || !containerRef.current) return;
     
     const container = containerRef.current;
-    const height = 360;
-    const margin = { top: 60, right: 40, bottom: 50, left: 60 };
+    const driverYearKeys = Object.keys(data);
+    const rowHeight = 40;
+    const height = 100 + (driverYearKeys.length + 1) * rowHeight; // +1 for ideal
+    const margin = { top: 60, right: 40, bottom: 50, left: 120 };
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
@@ -44,7 +46,6 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Get first dataset to determine ideal brake line and distance range
     const firstKey = Object.keys(data)[0];
     const firstData = data[firstKey];
     
@@ -53,92 +54,115 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
       .domain(d3.extent(firstData, (d) => d.distance) as [number, number])
       .range([0, innerW]);
 
-    const y = d3.scaleLinear().domain([-0.05, 1.05]).range([innerH, 0]);
+    const allKeys = ["ideal", ...driverYearKeys];
+    const y = d3
+      .scaleBand()
+      .domain(allKeys)
+      .range([0, innerH])
+      .padding(0.2);
 
-    // Axes
+    // Color scale
+    const colorScale = d3
+      .scaleOrdinal<string>()
+      .domain(allKeys)
+      .range(["#ff0000", ...d3.schemeTableau10]);
+
+    // Draw horizontal grid lines
+    allKeys.forEach(key => {
+      g.append("line")
+        .attr("x1", 0)
+        .attr("x2", innerW)
+        .attr("y1", y(key)! + y.bandwidth() / 2)
+        .attr("y2", y(key)! + y.bandwidth() / 2)
+        .attr("stroke", "#333")
+        .attr("stroke-width", 0.5);
+    });
+
+    // Helper function to find braking segments
+    const findBrakingSegments = (points: BrakingPoint[], brakeKey: "ideal_brake" | "driver_brake") => {
+      const segments: Array<{ start: number; end: number }> = [];
+      let inSegment = false;
+      let segmentStart = 0;
+
+      for (let i = 0; i < points.length; i++) {
+        const isBraking = points[i][brakeKey] > 0;
+        
+        if (isBraking && !inSegment) {
+          // Start new segment
+          segmentStart = points[i].distance;
+          inSegment = true;
+        } else if (!isBraking && inSegment) {
+          // End segment
+          segments.push({ start: segmentStart, end: points[i - 1].distance });
+          inSegment = false;
+        }
+      }
+      
+      // Close last segment if still braking at end
+      if (inSegment) {
+        segments.push({ start: segmentStart, end: points[points.length - 1].distance });
+      }
+      
+      return segments;
+    };
+
+    // Draw ideal brake segments
+    const idealSegments = findBrakingSegments(firstData, "ideal_brake");
+    idealSegments.forEach(segment => {
+      g.append("rect")
+        .attr("x", x(segment.start))
+        .attr("y", y("ideal")!)
+        .attr("width", Math.max(2, x(segment.end) - x(segment.start)))
+        .attr("height", y.bandwidth())
+        .attr("fill", colorScale("ideal"))
+        .attr("opacity", 0.8);
+    });
+
+    // Draw each driver's brake segments
+    driverYearKeys.forEach(key => {
+      const segments = findBrakingSegments(data[key], "driver_brake");
+      
+      segments.forEach(segment => {
+        g.append("rect")
+          .attr("x", x(segment.start))
+          .attr("y", y(key)!)
+          .attr("width", Math.max(2, x(segment.end) - x(segment.start)))
+          .attr("height", y.bandwidth())
+          .attr("fill", colorScale(key))
+          .attr("opacity", 0.8);
+      });
+    });
+
+    // X-axis (bottom)
     g.append("g")
       .attr("transform", `translate(0,${innerH})`)
       .call(d3.axisBottom(x).ticks(10))
-      .append("text")
+      .selectAll("text")
+      .attr("fill", "white");
+
+    g.append("text")
       .attr("x", innerW / 2)
-      .attr("y", 36)
-      .attr("fill", "#ffffffff")
+      .attr("y", innerH + 40)
+      .attr("fill", "white")
       .attr("text-anchor", "middle")
       .text("Distance along lap [m]");
 
+    // Y-axis (left) - driver labels
     g.append("g")
-      .call(d3.axisLeft(y).ticks(5))
-      .append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("y", -50)
-      .attr("x", -innerH / 2)
-      .attr("fill", "#ffffffff")
-      .attr("text-anchor", "middle")
-      .text("Brake (0–1)");
+      .call(d3.axisLeft(y).tickFormat(d => d === "ideal" ? "Ideal Lap" : d.replace("_", " ")))
+      .selectAll("text")
+      .attr("fill", "white")
+      .attr("font-size", 11);
 
-    // Color scale for different driver-year combinations
-    const driverYearKeys = Object.keys(data);
-    const colorScale = d3
-      .scaleOrdinal<string>()
-      .domain(["ideal", ...driverYearKeys])
-      .range(["#ff0000", ...d3.schemeTableau10]);
-
-    // Draw ideal brake line (same across all)
-    const lineIdeal = d3
-      .line<BrakingPoint>()
-      .x(d => x(d.distance))
-      .y(d => y(d.ideal_brake ?? 0))
-      .curve(d3.curveMonotoneX);
-
-    g.append("path")
-      .datum(firstData)
-      .attr("fill", "none")
-      .attr("stroke", colorScale("ideal"))
-      .attr("stroke-width", 2.5)
-      .attr("d", lineIdeal as any);
-
-    // Draw each driver-year line
-    const lineDriver = d3
-      .line<BrakingPoint>()
-      .x(d => x(d.distance))
-      .y(d => y(d.driver_brake ?? 0))
-      .curve(d3.curveMonotoneX);
-
-    driverYearKeys.forEach(key => {
-      g.append("path")
-        .datum(data[key])
-        .attr("fill", "none")
-        .attr("stroke", colorScale(key))
-        .attr("stroke-width", 2.5)
-        .attr("d", lineDriver as any);
-    });
-
-    // Legend
+    // Legend (optional, since labels are on y-axis)
     const legend = svg.append("g").attr("transform", `translate(${margin.left + 10},${10})`);
-    
-    const legendItems = ["ideal", ...driverYearKeys];
-    const itemsPerRow = 3;
-    
-    legendItems.forEach((key, i) => {
-      const row = Math.floor(i / itemsPerRow);
-      const col = i % itemsPerRow;
-      const xOffset = col * 150;
-      const yOffset = row * 20;
-      
-      legend.append("circle")
-        .attr("cx", xOffset + 6)
-        .attr("cy", yOffset + 6)
-        .attr("r", 5)
-        .attr("fill", colorScale(key));
-      
-      const label = key === "ideal" ? "Ideal Lap (fastest)" : key.replace("_", " ");
-      legend.append("text")
-        .attr("x", xOffset + 18)
-        .attr("y", yOffset + 10)
-        .text(label)
-        .attr("font-size", 11)
-        .attr("fill", "white");
-    });
+    legend.append("text")
+      .attr("x", 0)
+      .attr("y", 0)
+      .text("Braking Periods")
+      .attr("font-size", 14)
+      .attr("fill", "white")
+      .attr("font-weight", "bold");
 
     // Tooltip
     const tooltip = d3.select(container).append("div")
@@ -161,28 +185,35 @@ export const BrakingComparison: React.FC<Props> = ({ data }) => {
     const bisect = d3.bisector<BrakingPoint, number>(d => d.distance).left;
 
     overlay.on("mousemove", function (event) {
-    const pointer = d3.pointer(event);
-    const xm = x.invert(pointer[0]);
-    
-    let tooltipHtml = `<div><strong>Distance:</strong> ${xm.toFixed(1)} m</div>`;
-    tooltipHtml += `<div><strong>Ideal Brake:</strong> ${firstData[bisect(firstData, xm)]?.ideal_brake?.toFixed(2) ?? "N/A"}</div>`;
-    
-    driverYearKeys.forEach(key => {
-      const dataset = data[key];
-      const i = Math.max(0, Math.min(dataset.length - 1, bisect(dataset, xm)));
-      const d = dataset[i];
-      if (d) {
-        tooltipHtml += `<div><strong>${key}:</strong> ${d.driver_brake.toFixed(2)}</div>`;
+      const pointer = d3.pointer(event);
+      const xm = x.invert(pointer[0]);
+      
+      let tooltipHtml = `<div><strong>Distance:</strong> ${xm.toFixed(1)} m</div>`;
+      
+      // Check ideal
+      const idealIdx = bisect(firstData, xm);
+      const idealPoint = firstData[idealIdx];
+      if (idealPoint) {
+        tooltipHtml += `<div><strong>Ideal:</strong> ${idealPoint.ideal_brake >= 0.5 ? "Braking" : "Not braking"}</div>`;
       }
-    });
+      
+      // Check each driver
+      driverYearKeys.forEach(key => {
+        const dataset = data[key];
+        const i = Math.max(0, Math.min(dataset.length - 1, bisect(dataset, xm)));
+        const d = dataset[i];
+        if (d) {
+          tooltipHtml += `<div><strong>${key}:</strong> ${d.driver_brake >= 0.5 ? "Braking" : "Not braking"}</div>`;
+        }
+      });
 
-    tooltip.style("display", "block")
-      .style("left", `${event.clientX + window.scrollX + 12}px`)
-      .style("top", `${event.clientY + window.scrollY - 28}px`)
-      .html(tooltipHtml);
-  }).on("mouseleave", function () {
-    tooltip.style("display", "none");
-  });
+      tooltip.style("display", "block")
+        .style("left", `${event.clientX + 12}px`)
+        .style("top", `${event.clientY - 28}px`)
+        .html(tooltipHtml);
+    }).on("mouseleave", function () {
+      tooltip.style("display", "none");
+    });
   }, [data, width]);
 
   return <div ref={containerRef} style={{ width: "100%", position: "relative" }} />;
