@@ -1,23 +1,43 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import {
-  type TrackDominancePoint,
-} from "../api/fetchTrackDominance";
+import { type TrackDominancePoint } from "../api/fetchTrackDominance";
+import { driverCode } from "../utils/configureFilterData";
 
 export interface TrackDominanceProps {
   data: TrackDominancePoint[];
+  driverNames: string[];
+  sessionYears: string[];
 }
 
-export const TrackDominance: React.FC<TrackDominanceProps>  = ({ data }) => {
+export const TrackDominance: React.FC<TrackDominanceProps> = ({
+  data,
+  driverNames,
+  sessionYears,
+}) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
-    useEffect(() => {
+  const codeToDriver = Object.fromEntries(
+    Object.entries(driverCode).map(([name, code]) => [code, name])
+  );
+
+  useEffect(() => {
     if (!data) return;
+    const driverCodes = driverNames.map((d) => driverCode[d]);
+    const fastestList = driverCodes.flatMap((code) =>
+      sessionYears.map((year) => `${code}_${year}`)
+    );
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const width = 700;
+    const legendGroup = svg.append("g").attr("class", "legend-group");
+    const trackGroup = svg
+      .append("g")
+      .attr("class", "track-group")
+      .attr("transform", "translate(100, 0)");
+
+    //  --- Track ---
+    const width = 500;
     const height = 500;
     const margin = 10;
 
@@ -28,6 +48,7 @@ export const TrackDominance: React.FC<TrackDominanceProps>  = ({ data }) => {
       .scaleLinear()
       .domain(xExtent)
       .range([margin, width - margin]);
+
     const yScale = d3
       .scaleLinear()
       .domain(yExtent)
@@ -35,48 +56,74 @@ export const TrackDominance: React.FC<TrackDominanceProps>  = ({ data }) => {
 
     const colorScale = d3
       .scaleOrdinal<string>()
-      .domain([...new Set(data.map((d) => d.fastest))])
+      .domain(fastestList)
       .range(d3.schemeTableau10);
 
+    const startPoint = data[0];
     const sectors = d3.group(data, (d) => d.minisector);
 
     const line = d3
       .line<TrackDominancePoint>()
       .x((d) => xScale(d.x))
-      .y((d) => yScale(d.y));
+      .y((d) => yScale(d.y))
+      .curve(d3.curveCatmullRom.alpha(0.7));
+
+    const tooltip = d3
+      .select("body")
+      .append("div")
+      .style("position", "absolute")
+      .style("padding", "4px 8px")
+      .style("background", "rgba(0,0,0,0.7)")
+      .style("color", "white")
+      .style("border-radius", "4px")
+      .style("pointer-events", "none")
+      .style("opacity", 0)
+      .style("transition", "opacity 120ms ease");
 
     for (const [, points] of sectors) {
-      svg
+      trackGroup
         .append("path")
         .datum(points)
         .attr("fill", "none")
-        .attr("stroke", colorScale(points[0].fastest)!)
+        .attr("stroke", colorScale(points[0].fastest))
         .attr("stroke-width", 8)
-        .attr("d", line);
+        .attr("d", line)
+        .on("mouseover", function () {
+          d3.select(this).attr("stroke-width", 14);
+        })
+        .on("mousemove", function (event) {
+          tooltip
+            .html(
+              `
+              Minisector: ${points[0].minisector}<br>
+              Driver: ${codeToDriver[points[0].fastest.split("_")[0]]}<br>
+              Year: ${points[0].year}
+              `
+            )
+            .style("opacity", 1)
+            .style("left", event.pageX + 10 + "px")
+            .style("top", event.pageY + "px");
+        })
+        .on("mouseout", function () {
+          d3.select(this).attr("stroke-width", 8);
+          tooltip.style("opacity", 0);
+        });
+    }
 
-      const midIndex = Math.floor(points.length / 2);
-      const midPoint = points[midIndex];
-
-      // Add minisector label
-      svg
-        .append("text")
-        .attr("x", xScale(midPoint.x))
-        .attr("y", yScale(midPoint.y))
-        .attr("text-anchor", "middle")
-        .attr("alignment-baseline", "middle")
-        .attr("font-size", 10)
-        .attr("fill", "white")
-        .attr("stroke", "black")
-        .attr("stroke-width", 0.5)
-        .attr("paint-order", "stroke")
-        .text(midPoint.minisector);
+    if (startPoint) {
+      trackGroup
+        .append<SVGImageElement>("image")
+        .attr("href", "public/images/start_track.png")
+        .attr("x", xScale(startPoint.x) - 8)
+        .attr("y", yScale(startPoint.y) - 8)
+        .attr("width", 21)
+        .attr("height", 21);
     }
 
     // --- Legend ---
-    const drivers = Array.from(new Set(data.map((d) => d.fastest)));
-    const legend = svg
+    const legend = legendGroup
       .selectAll(".legend")
-      .data(drivers)
+      .data(fastestList)
       .enter()
       .append("g")
       .attr("transform", (_, i) => `translate(0, ${30 + i * 20})`);
@@ -96,5 +143,5 @@ export const TrackDominance: React.FC<TrackDominanceProps>  = ({ data }) => {
       .text((d) => d);
   }, [data]);
 
-  return <svg ref={svgRef} width={700} height={500}></svg>;
+  return <svg ref={svgRef} width={675} height={500}></svg>;
 };

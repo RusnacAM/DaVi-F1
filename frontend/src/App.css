@@ -27,11 +27,15 @@
   align-items: center;
   justify-content: space-between;
   margin: 30px;
-  width: 850px;
+  gap: 10px;
 }
 
 .track-map {
-  width: 700px;
+  width: 675px;
   height: 500px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
