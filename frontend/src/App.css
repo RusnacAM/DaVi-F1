@@ -105,13 +105,13 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  margin: 30px;
+  margin: 25px;
   gap: 10px;
 }
 
 .track-map {
-  width: 675px;
-  height: 500px;
+  width: 600px;
+  height: 600px;
   flex-shrink: 0;
   display: flex;
   justify-content: center;
@@ -119,17 +119,16 @@
 }
 
 .AvgDiffs-Chart {
-  width: 700px;
-  height: 350px;
+  width: 900px;
+  height: 330px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 .lap-gap-evolution {
-  margin-top: 30px;
-  width: 700px;
-  height: 300px;
+  width: 900px;
+  height: 330px;
   display: flex;
   justify-content: center;
   align-items: center;

@@ -35,8 +35,10 @@ export const TrackTab: React.FC<TrackTabProps> = ({
 }) => {
   const [data, setData] = useState<TrackDominanceResponse>([]);
   const [AvgDiffsData, setDataAvgDiffs] = useState<AvgDiffsResponse>([]);
-  const [data_lap_gap_evolution, setDataLapGapEvolution] =
-    useState<LapGapEvolutionResponse>([]);
+  const [data_lap_gap_evolution, setDataLapGapEvolution] = useState<LapGapEvolutionResponse>({
+    lapGaps: {},
+    corners: []
+  });
   const [loadingState, setLoadingState] = useState(false);
 
   const driverCodes = driverNames.map((d) => driverCode[d]);
@@ -142,14 +144,15 @@ export const TrackTab: React.FC<TrackTabProps> = ({
 
           <div className="lap-gap-evolution">
             {data_lap_gap_evolution && !loadingState ? (
-            <LapGapEvolution
-              data={data_lap_gap_evolution}
-              sessionYears={sessionYears}
-              driverColorMap={driverColorMap}
-            />
-          ) : (
-            <CircularProgress size={50} color="primary" />
-          )}
+              <LapGapEvolution
+                lapGaps={data_lap_gap_evolution.lapGaps}
+                sessionYears={sessionYears}
+                corners={data_lap_gap_evolution.corners}
+                driverColorMap={driverColorMap}
+              />
+            ) : (
+              <CircularProgress size={50} color="primary" />
+            )}
           </div>
         </div>
       </div>

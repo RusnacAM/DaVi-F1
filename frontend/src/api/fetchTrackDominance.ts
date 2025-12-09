@@ -9,6 +9,7 @@ export interface TrackDominancePoint {
   driver: string;
   year: number;
   TimeGainFastest: number;
+  Label: string;
 }
 
 export type TrackDominanceResponse = TrackDominancePoint[]
