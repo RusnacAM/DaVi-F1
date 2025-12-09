@@ -5,8 +5,8 @@ import { getDriverYearColor } from "../utils/configureFilterData";
 
 
 // Set Visualization Dimensions and Margins
-const WIDTH = 700;
-const HEIGHT = 350;
+const WIDTH = 900;
+const HEIGHT = 340;
 const MARGIN = { top: 50, right: 100, bottom: 50, left: 70 }; // Increased Right margin for Legend
 const INNER_W = WIDTH - MARGIN.left - MARGIN.right;
 const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom;
@@ -179,7 +179,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
       .call(d3.axisBottom(x0))
       .selectAll("text")
       // shift tick labels further away from the axis when there are negative values
-      .attr("dy", yMin < 0 ? "4em" : "1em")
+      .attr("dy", yMin < 0 ? "2em" : "1em")
       .style("font-size", "14px")
       .style("font-weight", "600")
       .style("text-transform", "capitalize") // Capitalize sector names

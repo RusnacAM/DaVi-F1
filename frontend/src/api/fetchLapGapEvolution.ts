@@ -2,21 +2,34 @@ import { apiRequest } from "./api-client";
 import { driverCode } from "../utils/configureFilterData"
 
 export interface LapGapEvolutionPoint {
-  x: number;
-  y: number;
-  driver: string;
-  year: number;
+    x: number;
+    y: number;
+    driver: string;
+    year: number;
 }
 
-export type LapGapEvolutionResponse = LapGapEvolutionPoint[]
+export interface Corner {
+    distance: number;
+    label: string;
+}
 
-export const fetchLapGapEvolution = async (sessionName: string, identifier: string, drivers: string[], sessionYears: string[] ): Promise<LapGapEvolutionResponse> => {
-  const driverCodes = drivers.map(d => driverCode[d]);
-  let driversParam = "";
-  driverCodes.forEach(driverCode => driversParam += `&drivers=${driverCode}`);
+export interface LapGapEvolutionResponse {
+    lapGaps: Record<string, LapGapEvolutionPoint[]>;
+    corners: Corner[];
+}
 
-  let yearsParam = "";
-  sessionYears.forEach(year => yearsParam += `&session_years=${year}`)
+export const fetchLapGapEvolution = async (
+    sessionName: string,
+    identifier: string,
+    drivers: string[],
+    sessionYears: string[]
+): Promise<LapGapEvolutionResponse> => {
+    const driverCodes = drivers.map(d => driverCode[d]);
+    let driversParam = "";
+    driverCodes.forEach(driverCode => driversParam += `&drivers=${driverCode}`);
 
-  return await apiRequest<LapGapEvolutionResponse>(`/lap-gap-evolution?session_name=${sessionName}&identifier=${identifier}${driversParam}${yearsParam}`, 'GET')
+    let yearsParam = "";
+    sessionYears.forEach(year => yearsParam += `&session_years=${year}`)
+
+    return await apiRequest<LapGapEvolutionResponse>(`/lap-gap-evolution?session_name=${sessionName}&identifier=${identifier}${driversParam}${yearsParam}`, 'GET')
 };
