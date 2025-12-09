@@ -10,8 +10,6 @@ type FilterConfigsContextValue = {
     setSessionIdentifier: (newSessionIdentifier: string) => void,
     driverNames: string[],
     setDriverNames: (newDriverNames: string[]) => void,
-    tabValue: number,
-    setTabValue: (newTabValue: number) => void
 }
 
 const FilterConfigsContext = createContext<FilterConfigsContextValue>({} as FilterConfigsContextValue)
@@ -26,7 +24,6 @@ export const FilterConfigsProvider: React.FC<{
     const [sessionName, setSessionName] = useState<string>("Bahrain Grand Prix");
     const [sessionIdentifier, setSessionIdentifier] = useState<string>("Race")
     const [driverNames, setDriverNames] = useState<string[]>(["Max Verstappen", "Lando Norris"]);
-    const [tabValue, setTabValue] = useState<number>(0);
 
     return (
       <FilterConfigsContext.Provider value={{
@@ -38,8 +35,6 @@ export const FilterConfigsProvider: React.FC<{
         setSessionIdentifier,
         driverNames,
         setDriverNames,
-        tabValue,
-        setTabValue
       }}>
         {children}
       </FilterConfigsContext.Provider>

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import * as d3 from "d3";
 import BrakingDistributionBoxPlot from "../BrakingDistributionBoxPlot";
 import {
   fetchTelemetry,
@@ -16,10 +15,6 @@ import {
 import { BrakingComparison } from "../BrakingComparison";
 import { TelemetryLineChart } from "../../components/TelemetryLineChart";
 import { CircularProgress } from "@mui/material";
-import {
-  driverCode,
-  getDriverYearColor,
-} from "../../utils/configureFilterData";
 
 export interface BreakingTabProps {
   sessionYears: string[];
@@ -27,6 +22,7 @@ export interface BreakingTabProps {
   sessionIdentifier: string;
   driverNames: string[];
   refreshKey: number;
+  driverColorMap: Record<string, string>;
 }
 
 export const BreakingTab: React.FC<BreakingTabProps> = ({
@@ -35,26 +31,12 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
   sessionIdentifier,
   driverNames,
   refreshKey,
+  driverColorMap,
 }) => {
-  const [telemetryData, setTelemetryData] = useState<TelemetryResponse | null>(
-    null
-  );
-  const [brakingData, setBrakingData] = useState<Record<
-    string,
-    BrakingPoint[]
-  > | null>(null);
-  const [brakingDist, setBrakingDist] = useState<BrakingDistributionPoint[]>(
-    []
-  );
-
+  const [telemetryData, setTelemetryData] = useState<TelemetryResponse | null>(null);
+  const [brakingData, setBrakingData] = useState<Record<string,BrakingPoint[]> | null>(null);
+  const [brakingDist, setBrakingDist] = useState<BrakingDistributionPoint[]>([]);
   const [loadingState, setLoadingState] = useState(false);
-
-  const driverCodes = driverNames.map((d) => driverCode[d]);
-  const baseColors = d3.schemeTableau10;
-  const driverColorMap: Record<string, string> = {};
-  driverCodes.forEach((code, i) => {
-    driverColorMap[code] = baseColors[i % baseColors.length];
-  });
 
   const fetchData = async () => {
     try {

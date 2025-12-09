@@ -1,6 +1,6 @@
-import { Box, Button, Tab, Tabs } from "@mui/material";
-import { FilterSelect } from "../FilterSelect";
-import { MultiSelect } from "../MultiSelect";
+import { Button } from "@mui/material";
+import { FilterSelect } from "./FilterSelect";
+import { MultiSelect } from "./MultiSelect";
 import useFilterConfigs from "../../hooks/useFilterConfigs";
 import {
   DRIVERS,
@@ -24,8 +24,6 @@ const FilterMenu: React.FC<FilterMenuProps> = ({ onClickSelect }) => {
     setSessionName,
     sessionIdentifier,
     setSessionIdentifier,
-    tabValue,
-    setTabValue,
   } = useFilterConfigs();
 
   // the session names intersection over all the selected years
@@ -63,10 +61,6 @@ const FilterMenu: React.FC<FilterMenuProps> = ({ onClickSelect }) => {
     );
   }, [sessionYears, sessionName, sessionIdentifier, driverNames]);
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
-
   return (
     <div className="filter-menu">
       <div className="filters">
@@ -75,6 +69,7 @@ const FilterMenu: React.FC<FilterMenuProps> = ({ onClickSelect }) => {
           setValue={setSessionYears}
           menuItems={YEARS}
           label={"Session Years"}
+          selectLimit={2}
         />
 
         <FilterSelect
@@ -96,14 +91,8 @@ const FilterMenu: React.FC<FilterMenuProps> = ({ onClickSelect }) => {
           setValue={setDriverNames}
           menuItems={commonDriverNames}
           label={"Drivers"}
+          selectLimit={10}
         />
-
-        {/* <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Tabs value={tabValue} onChange={handleTabChange} textColor="inherit">
-          <Tab label="Track Dominance" value={0} sx={{ color: "white" }} />
-          <Tab label="Braking" value={1} sx={{ color: "white" }} />
-        </Tabs>
-      </Box> */}
       </div>
       <Button
         variant="contained"
@@ -112,7 +101,7 @@ const FilterMenu: React.FC<FilterMenuProps> = ({ onClickSelect }) => {
         sx={{
           padding: "10px 20px",
           borderRadius: "8px",
-          fontSize: "14px"
+          fontSize: "14px",
         }}
       >
         Filter
