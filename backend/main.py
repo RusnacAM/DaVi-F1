@@ -6,6 +6,7 @@ import numpy as np
 import os
 import math
 from scipy import interpolate
+from scipy.spatial import cKDTree
 
 from utils.sectors import sector_dict, label_dict, labels_spanish, labels_bahrain, labels_austria, labels_italy, labels_britian, labels_abuDhabi
 from typing import List
@@ -337,6 +338,7 @@ def braking_comparison(
     
     return result
 
+
 @app.get("/api/v1/braking-distribution")
 def get_braking_distribution(
     session_year: str, 
@@ -380,6 +382,7 @@ def get_braking_distribution(
 
     return {"data": output}
     return result.to_dict(orient="records")
+
 
 @app.get("/api/v1/AvgDiffs")
 def get_average_loss_to_fastest(session_name: str, identifier: str, drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
@@ -513,95 +516,155 @@ def get_average_loss_to_fastest(session_name: str, identifier: str, drivers: lis
 
 
 @app.get("/api/v1/lap-gap-evolution")
-def get_lap_gap_evolution(session_name: str, identifier: str,  drivers: List[str] = Query(None), session_years: List[int] = Query(None)):
-    fastest_laps = {}
-    telemetry_data = {}
+def get_lap_gap_evolution(
+    session_name: str, 
+    identifier: str,  
+    drivers: List[str] = Query(None), 
+    session_years: List[int] = Query(None)
+):
+    # Container to hold valid lap data
+    lap_data_list = []
+    
+    # Tracking reference info
+    global_fastest_time = None
+    ref_index = -1 
+
+    ### ---- Load Data ---- ###
+    if not drivers or not session_years:
+        return {"lapGaps": {}, "corners": []}
 
     for year in session_years:
-        session = get_loaded_session(year, session_name, identifier)
-        for driver in drivers:
-            lap = session.laps.pick_drivers(driver).pick_fastest()
+        try:
+            session_event = get_loaded_session(year, session_name, identifier)
+            driver_laps = session_event.laps.pick_drivers(drivers)
 
-            if lap is None or len(lap) == 0:
-                continue
-            
-            fastest_laps[(driver, year)] = lap['LapTime']
+            for driver in drivers:
+                lap = driver_laps.pick_drivers(driver).pick_fastest()
 
-            telemetry = lap.get_telemetry().add_distance()
-            telemetry['Driver'] = driver
-            telemetry['Year'] = year
-            telemetry['DriverYear'] = f"{driver} {year}"
-
-            telemetry_data[f"{driver} {year}"] = telemetry.reset_index(drop=True) 
-
-    reference_driver_year = min(fastest_laps, key=fastest_laps.get)
-    reference_driver_year = f"{reference_driver_year[0]} {reference_driver_year[1]}"
-    ref_tel = telemetry_data[reference_driver_year]
-    common_distance = ref_tel['Distance'].values
-
-        
-    # Store interpolated speed data
-    interpolated_speeds = {}
-        
-    # Interpolate all drivers to common distance points
-    for driver_year in telemetry_data.keys():
-        tel = telemetry_data[driver_year]
+                if pd.isna(lap['LapTime']):
+                    continue
                 
-        if len(tel['Distance']) > 10:
-            f_speed = interpolate.interp1d(
-                tel['Distance'], tel['Speed'],
-                kind='linear', bounds_error=False, 
-                fill_value='extrapolate'
-            )
-            interpolated_speeds[driver_year] = f_speed(common_distance)
+                lap_time = lap['LapTime']
+                telemetry = lap.get_telemetry().add_distance()
+                
+                entry = {
+                    "driver": driver,
+                    "year": year,
+                    "driver_year": f"{driver} {year}", 
+                    "time": lap_time,
+                    "x_coord": telemetry['X'].values,
+                    "y_coord": telemetry['Y'].values,
+                    "distance": telemetry['Distance'].values,
+                    "time_series": telemetry['Time'].dt.total_seconds().values,
+                    "session": session_event 
+                }
+                
+                lap_data_list.append(entry)
+
+                if global_fastest_time is None or lap_time < global_fastest_time:
+                    global_fastest_time = lap_time
+                    ref_index = len(lap_data_list) - 1
+        except Exception as e:
+            print(f"Error processing {year}: {e}")
+            continue
+
+    if not lap_data_list or ref_index == -1:
+        return {"lapGaps": {}, "corners": []}
+
+    ### ---- Prepare Reference Data ---- ###
+    reference_entry = lap_data_list[ref_index]
+    ref_time_series = reference_entry["time_series"]
+    ref_distance = reference_entry["distance"]
+    ref_id = reference_entry["driver_year"]
     
-    time_diff_list = []
+    # KDTree for spatial matching
+    ref_coords = np.column_stack((reference_entry["x_coord"], reference_entry["y_coord"]))
+    ref_tree = cKDTree(ref_coords)
 
-    # Calculate cumulative time differences
     result = {}
-    if reference_driver_year in interpolated_speeds:
-        ref_speed = interpolated_speeds[reference_driver_year]
-                
-        for driver_year in interpolated_speeds.keys():
-            if driver_year != reference_driver_year:
-                driver_speed = interpolated_speeds[driver_year]
-                        
-                # Calculate distance segments
-                distance_segments = np.diff(common_distance)
-                distance_segments = np.append(distance_segments, distance_segments[-1])
-                    
-                # Prevent division by zero
-                ref_speed_safe = np.maximum(ref_speed, 1.0)
-                driver_speed_safe = np.maximum(driver_speed, 1.0)
-                        
-                # Time calculation: t = d / v (convert km/h to m/s)
-                ref_time_segments = distance_segments / (ref_speed_safe / 3.6)
-                driver_time_segments = distance_segments / (driver_speed_safe / 3.6)
-                    
-                # Cumulative time difference
-                time_diff = np.cumsum(driver_time_segments - ref_time_segments)
-                time_diff_list.append(time_diff)
-
-                lap_gap = pd.DataFrame({
-                "x": common_distance.tolist(),
-                "y": time_diff.tolist(),
-                "driver": driver_year[:3],
-                "year": int(driver_year[-4:])
-                }).astype(object)
+    
+    # Configuration
+    TARGET_POINTS = 800  # Number of points to plot
+    SMOOTHING_WINDOW = 15 # Filter strength (Higher = Smoother but less detail)
+    
+    ### ---- Calculate Gaps ---- ###
+    for entry in lap_data_list:
+        driver_year = entry["driver_year"]
+        
+        if driver_year == ref_id:
+            continue
             
-                result[driver_year] = lap_gap.to_dict(orient="records")
+        d_x = entry["x_coord"]
+        d_y = entry["y_coord"]
+        d_dist = entry["distance"]
+        d_time = entry["time_series"]
+        
+        # 1. Downsample INPUT data (optimization)
+        if len(d_x) > TARGET_POINTS:
+            step = len(d_x) // TARGET_POINTS
+            d_x = d_x[::step]
+            d_y = d_y[::step]
+            d_dist = d_dist[::step]
+            d_time = d_time[::step]
 
-
-    circuit_info = session.get_circuit_info()
-
-    all_diffs = np.concatenate(time_diff_list)
-
-    corners = []
-    for _, corner in circuit_info.corners.iterrows():
-        corners.append({
-            "distance": float(corner["Distance"]),
-            "label": f"{corner['Number']}{corner['Letter']}",
+        driver_coords = np.column_stack((d_x, d_y))
+        
+        # 2. Spatial Query
+        dists, indices = ref_tree.query(driver_coords, k=2)
+        
+        # 3. Disambiguate Matches (Fix crossovers/bridges)
+        idx_0 = indices[:, 0]
+        idx_1 = indices[:, 1]
+        
+        ref_d_0 = ref_distance[idx_0]
+        ref_d_1 = ref_distance[idx_1]
+        
+        delta_0 = np.abs(ref_d_0 - d_dist)
+        delta_1 = np.abs(ref_d_1 - d_dist)
+        
+        use_second = (delta_0 > 500) & (delta_1 < 500)
+        chosen_indices = np.where(use_second, idx_1, idx_0)
+        
+        # 4. Calculate Raw Gap
+        ref_time_at_match = ref_time_series[chosen_indices]
+        gap_series_raw = d_time - ref_time_at_match
+        
+        # 5. Apply Smoothing (Moving Average)
+        # This removes the jagged noise seen in your screenshot
+        gap_series_smooth = pd.Series(gap_series_raw).rolling(
+            window=SMOOTHING_WINDOW, 
+            center=True, 
+            min_periods=1
+        ).mean().values
+        
+        x_axis_dist = ref_distance[chosen_indices]
+        
+        lap_gap = pd.DataFrame({
+            "x": x_axis_dist,
+            "y": gap_series_smooth,
+            "driver": driver_year[:3], 
+            "year": int(entry["year"])
         })
+
+        lap_gap = lap_gap.sort_values(by="x").dropna()
+        
+        # Remove finish line artifact
+        if not lap_gap.empty:
+            lap_gap = lap_gap.iloc[:-1]
+    
+        result[driver_year] = lap_gap.to_dict(orient="records")
+
+    ### ---- Get Circuit Info ---- ###
+    ref_session = reference_entry["session"]
+    circuit_info = ref_session.get_circuit_info()
+    
+    corners = []
+    if circuit_info is not None:
+        for _, corner in circuit_info.corners.iterrows():
+            corners.append({
+                "distance": float(corner["Distance"]),
+                "label": f"{corner['Number']}{corner['Letter']}",
+            })
 
     return {
         "lapGaps": result,
