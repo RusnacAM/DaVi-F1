@@ -58,10 +58,20 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
 
         // Scales
         const xExtent = d3.extent(allPoints, (d) => d.x) as [number, number];
-        const yExtent = d3.extent(allPoints, (d) => d.y) as [number, number];
+        
+        // Fix: d3.extent only sees 'slower' drivers (gaps > 0). 
+        // We must manually include 0 in the domain to represent the reference driver correctly.
+        const yMin = d3.min(allPoints, (d) => d.y) || 0;
+        const yMax = d3.max(allPoints, (d) => d.y) || 0;
 
-        const xScale = d3.scaleLinear().domain(xExtent).range([0, innerWidth]);
-        const yScale = d3.scaleLinear().domain([yExtent[0], yExtent[1]]).range([innerHeight, 0]);
+        const xScale = d3.scaleLinear()
+            .domain(xExtent)
+            .range([0, innerWidth]);
+
+        const yScale = d3.scaleLinear()
+            .domain([Math.min(0, yMin), Math.max(0, yMax)]) // Ensure 0 is included
+            .nice() // Round the domain nicely
+            .range([innerHeight, 0]);
 
         const colorScale = (fastest: string) => getDriverYearColor(fastest, driverColorMap, sessionYears);
 
@@ -108,7 +118,8 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
             .attr("y2", yScale(0))
             .attr("stroke", "white")
             .attr("stroke-dasharray", "5,5")
-            .attr("stroke-width", 2);
+            .attr("stroke-width", 2)
+            .attr("opacity", 0.5);
 
         // Line generator
         const line = d3
@@ -121,6 +132,7 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
             g.append("path")
                 .datum(lapGaps[driverKey])
                 .attr("stroke", () => {
+                    // Backend sends "VER 2023", Map expects "VER_2023"
                     const key = driverKey.replace(" ", "_");
                     return colorScale(key);
                 })
@@ -129,7 +141,7 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                 .attr("d", line);
         });
 
-        // Create tooltip
+        // Create tooltip container
         const tooltip = g.append("g")
             .attr("class", "tooltip")
             .style("visibility", "hidden");
@@ -150,9 +162,11 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
             .attr("stroke", "white")
             .attr("y1", 0)
             .attr("y2", innerHeight)
+            .attr("stroke-dasharray", "2,2")
             .style("pointer-events", "none")
             .style("visibility", "hidden");
 
+        // Interaction Rect
         g.append("rect")
             .attr("width", innerWidth)
             .attr("height", innerHeight)
@@ -163,25 +177,26 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                 const x0 = xScale.invert(mx);
 
                 // Build tooltip content
-                let tooltipHTML: string[] = [];
-                Object.keys(lapGaps).forEach((driverKey) => {
+                // Gather data points at this X
+                const currentData = Object.keys(lapGaps).map((driverKey) => {
                     const points = lapGaps[driverKey];
                     const bisect = d3.bisector((d: LapGapEvolutionPoint) => d.x).left;
                     const i = bisect(points, x0);
-                    const point = points[i] || points[points.length - 1];
-                    const gapToReference = point.y;
-
-                    // Add driver and their gap to the tooltip content
-                    tooltipHTML.push(`${driverKey}: ${gapToReference.toFixed(3)} s`);
+                    // Handle edge cases for bisect
+                    const point = points[Math.min(i, points.length - 1)] || points[points.length - 1];
+                    return { key: driverKey, gap: point.y };
                 });
+
+                // Sort by gap size (descending) so the list order roughly matches line height
+                currentData.sort((a, b) => b.gap - a.gap);
 
                 tooltipText.selectAll("*").remove();
 
-                tooltipHTML.forEach((line, index) => {
+                currentData.forEach((d, index) => {
                     tooltipText.append("tspan")
                         .attr("x", 10)
                         .attr("y", 20 + index * 15)
-                        .text(line);
+                        .text(`${d.key}: ${d.gap.toFixed(3)} s`);
                 });
 
                 const bbox = tooltipText.node()?.getBBox();
@@ -191,12 +206,16 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                         .attr("height", bbox.height + 20);
                 }
 
-                // Update tooltip position  
+                // Prevent tooltip from overflowing the right side
+                let tooltipX = mx + 10;
+                if (tooltipX + (bbox?.width || 100) > innerWidth) {
+                    tooltipX = mx - (bbox?.width || 100) - 20;
+                }
+
                 tooltip
                     .style("visibility", "visible")
-                    .attr("transform", `translate(${mx}, 0)`);
+                    .attr("transform", `translate(${tooltipX}, 0)`);
 
-                // Show hover line at cursor
                 hoverLine
                     .attr("x1", mx)
                     .attr("x2", mx)
@@ -217,8 +236,8 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                 .attr("x2", xPos)
                 .attr("y1", 0)
                 .attr("y2", innerHeight)
-                .attr("stroke", "rgba(255, 255, 255, 0.5)")
-                .attr("stroke-dasharray", "4,4")
+                .attr("stroke", "rgba(255, 255, 255, 0.3)")
+                .attr("stroke-dasharray", "2,2")
                 .attr("stroke-width", 1);
 
             // Label
@@ -226,11 +245,11 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                 .attr("x", xPos)
                 .attr("y", -5)
                 .attr("text-anchor", "middle")
-                .attr("fill", "white")
+                .attr("fill", "rgba(255, 255, 255, 0.7)")
                 .attr("font-size", "10px")
                 .text(corner.label);
         });
-    }, [lapGaps, corners]);
+    }, [lapGaps, corners, driverColorMap, sessionYears]);
 
     return <svg ref={svgRef} width={800} height={325}></svg>;
 };

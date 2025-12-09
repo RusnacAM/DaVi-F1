@@ -3,7 +3,6 @@ import * as d3 from "d3";
 import { type AvgDiffsPoint } from "../api/fetchAvgDiffs";
 import { getDriverYearColor } from "../utils/configureFilterData";
 
-
 // Set Visualization Dimensions and Margins
 const WIDTH = 800;
 const HEIGHT = 325;
@@ -14,10 +13,14 @@ const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom;
 export interface AvgDiffsChartProps {
   data: AvgDiffsPoint[];
   driverColorMap: Record<string, string>;
-  sessionYears: string[]
+  sessionYears: string[];
 }
 
-export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorMap, sessionYears }) => {
+export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({
+  data,
+  driverColorMap,
+  sessionYears,
+}) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -26,8 +29,12 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    // remove any leftover tooltip from previous renders and create a tiny tooltip
-    d3.select(svgRef.current?.parentElement).selectAll(".avgdiffs-tooltip").remove();
+    // 1. Tooltip Setup
+    // Remove old tooltips to prevent duplicates
+    d3.select(svgRef.current?.parentElement)
+      .selectAll(".avgdiffs-tooltip")
+      .remove();
+
     const tooltip = d3
       .select(svgRef.current?.parentElement)
       .append("div")
@@ -47,37 +54,24 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
       .append("g")
       .attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
 
-    // --- 1. Data Preparation & Filtering ---
+    // --- 2. Data Preparation & Filtering ---
     const sectors = ["Slow", "Medium", "Fast", "Straight"];
     const allDriverYears = Array.from(new Set(data.map((d) => d.DriverYear)));
 
-    // A. Identify the Fastest Overall (Baseline) to remove
-    // We sum up the time diffs for each DriverYear. The one with the lowest sum is the fastest.
-    const sums = allDriverYears.map((dy) => {
-      const totalDiff = data
-        .filter((d) => d.DriverYear === dy)
-        .reduce((sum, curr) => sum + curr.Diff_to_Fastest_sec, 0);
-      return { dy, totalDiff };
-    });
+    const fastestDriver = data[0]?.FastestOverallDriver;
+    const fastestYear = data[0]?.FastestOverallYear;
 
-    // Sort ascending (lowest diff first) and pick the first one
-    const fastestEntry = sums.sort((a, b) => a.totalDiff - b.totalDiff)[0];
-    const fastestDriverYear = fastestEntry ? fastestEntry.dy : "";
+    const fastestDriverYear =
+      fastestDriver && fastestYear ? `${fastestDriver}_${fastestYear}` : "";
 
-    // B. Create the Filtered List (Exclude the fastest)
     const activeDriverYears = allDriverYears
       .filter((dy) => dy !== fastestDriverYear)
       .sort();
 
-    // C. Extract Drivers and Years from the FILTERED list
-    const activeDrivers = Array.from(new Set(activeDriverYears.map((dy) => dy.split("_")[0]))).sort();
-    //const activeYears = Array.from(new Set(activeDriverYears.map((dy) => dy.split("_")[1]))).sort();
-
-    // D. Group Data
+    // Group Data
     const groupedData = sectors.map((sector) => {
       const row: any = { sector };
       activeDriverYears.forEach((dy) => {
-        // Case-insensitive check for label
         const found = data.find(
           (d) =>
             d.DriverYear === dy &&
@@ -88,46 +82,33 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
       return row;
     });
 
-    // --- 2. Scales ---
+    // --- 3. Scales ---
     const x0 = d3.scaleBand().domain(sectors).range([0, INNER_W]).padding(0.2);
 
-    // x1 Domain is strictly the active (filtered) list. 
-    // This ensures bars are centered within the x0 band.
     const x1 = d3
       .scaleBand()
       .domain(activeDriverYears)
       .range([0, x0.bandwidth()])
       .padding(0.1);
 
-    // compute min/max from the actual plotted values so negatives are handled
     const allValues: number[] = groupedData.flatMap((row) =>
       activeDriverYears.map((dy) => Number(row[dy] ?? 0))
     );
+
     let yMin = d3.min(allValues) ?? 0;
     let yMax = d3.max(allValues) ?? 0;
-    // ensure zero is included so baseline is visible
     if (yMin > 0) yMin = 0;
     if (yMax < 0) yMax = 0;
 
     const y = d3.scaleLinear().domain([yMin, yMax]).nice().range([INNER_H, 0]);
 
-    const colorScale = (fastest: string) => getDriverYearColor(fastest, driverColorMap, sessionYears);
+    const colorScale = (fastest: string) =>
+      getDriverYearColor(fastest, driverColorMap, sessionYears);
 
-    // Map each driver to its sorted list of years (strings)
-    const yearsByDriver: Record<string, string[]> = Object.fromEntries(
-      activeDrivers.map((drv) => {
-        const yrs = activeDriverYears
-          .filter((dy) => dy.startsWith(drv + "_"))
-          .map((dy) => dy.split("_")[1])
-          .sort();
-        return [drv, yrs];
-      })
-    );
+    // Baseline Y is the pixel position of the value 0
+    const baselineY = y(0);
 
-    // determine baseline Y (clamped to chart area)
-    const baselineY = Math.max(0, Math.min(INNER_H, y(0)));
-
-    // --- 3. Drawing Bars ---
+    // --- 4. Drawing Bars ---
     const sectorGroup = g
       .selectAll(".sector-group")
       .data(groupedData)
@@ -141,14 +122,16 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
       .enter()
       .append("rect")
       .attr("x", (d) => x1(d.key)!)
-      // position & height relative to baseline so negative values go below x-axis
+      // Logic: If value > 0, rect starts at y(value) and goes down to baselineY.
+      // If value < 0, rect starts at baselineY and goes down to y(value).
+      // Math.min handles the "start y" correctly for both cases relative to SVG coords.
       .attr("y", (d) => Math.min(y(d.value), baselineY))
       .attr("width", x1.bandwidth())
       .attr("height", (d) => Math.abs(y(d.value) - baselineY))
       .attr("fill", (d) => colorScale(d.key))
-
-
-      // tiny tooltip interactions
+      .attr("fill-opacity", 1)
+      .attr("stroke", "none")
+      // Tooltip Interactions
       .on("mouseenter", function (event: any, d: any) {
         const [drv, yr] = d.key.split("_");
         tooltip
@@ -160,37 +143,47 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
           .style("opacity", "1");
       })
       .on("mousemove", function (event: any) {
-        // position tooltip next to cursor with slight offset
         tooltip
           .style("left", event.pageX + 10 + "px")
           .style("top", event.pageY + 8 + "px");
       })
       .on("mouseleave", function () {
         tooltip.style("opacity", "0");
-      })
-      // Removed variable opacity: always full opacity
-      .attr("fill-opacity", 1)
-      .attr("stroke", "none");
+      });
 
-    // --- 4. Axes & Labels ---
-    // X Axis
-    g.append("g")
-      .attr("transform", `translate(0,${baselineY})`)
-      .call(d3.axisBottom(x0))
-      .selectAll("text")
-      // shift tick labels further away from the axis when there are negative values
-      .attr("dy", yMin < 0 ? "2em" : "1em")
+    // --- 5. Axes & Labels ---
+
+    // X Axis: Positioned at INNER_H (Bottom of chart area)
+    const xAxisG = g.append("g")
+      .attr("transform", `translate(0,${INNER_H})`)
+      .call(d3.axisBottom(x0).tickSize(0)); // tickSize(0) hides ticks if you just want labels
+    
+    // Remove the horizontal line (domain) from the x-axis so it doesn't double up with the chart border
+    xAxisG.select(".domain").remove();
+
+    xAxisG.selectAll("text")
+      .attr("dy", "1em") // Standard spacing
       .style("font-size", "14px")
       .style("font-weight", "600")
-      .style("text-transform", "capitalize") // Capitalize sector names
-      .style("fill", "#fff"); // labels white
+      .style("text-transform", "capitalize")
+      .style("fill", "#fff");
+
+    // Zero Line: Drawn manually at y(0) to handle negative bars
+    g.append("line")
+      .attr("x1", 0)
+      .attr("x2", INNER_W)
+      .attr("y1", baselineY)
+      .attr("y2", baselineY)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1)
+      .attr("stroke-opacity", 0.5);
 
     // Y Axis
     g.append("g")
       .call(d3.axisLeft(y))
       .selectAll("text")
       .style("font-size", "12px")
-      .style("fill", "#fff"); // labels white
+      .style("fill", "#fff");
 
     // Y Label
     g.append("text")
@@ -202,15 +195,16 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
       .style("fill", "#fff")
       .text("Time loss (s)");
 
-    // Title: centered at the top of the SVG, includes baseline info if available
+    // Title
     const titleText = fastestDriverYear
       ? [
-        `Fastest driver: ${fastestDriverYear.split("_")[0]} (${fastestDriverYear.split("_")[1]})`,
-        "Average time loss to fastest driver"
-      ]
+          `Fastest driver: ${fastestDriverYear.split("_")[0]} (${fastestDriverYear.split("_")[1]})`,
+          "Average time loss to fastest driver",
+        ]
       : ["Avg Time Loss to Fastest"];
 
-    const title = svg.append("text")
+    const title = svg
+      .append("text")
       .attr("x", MARGIN.left + INNER_W / 2)
       .attr("y", MARGIN.top / 2)
       .attr("text-anchor", "middle")
@@ -218,15 +212,19 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({ data, driverColorM
       .style("font-weight", "600")
       .style("fill", "#fff");
 
-    // Create each line as a <tspan>
     titleText.forEach((line, i) => {
-      title.append("tspan")
+      title
+        .append("tspan")
         .attr("x", MARGIN.left + INNER_W / 2)
-        .attr("dy", i === 0 ? 0 : 18)   // ~18px spacing per line
+        .attr("dy", i === 0 ? 0 : 18)
         .text(line);
     });
 
-  }, [data]);
+    // Cleanup function when component unmounts
+    return () => {
+      tooltip.remove();
+    };
+  }, [data, driverColorMap, sessionYears]);
 
   return (
     <div style={{ overflowX: "auto" }}>

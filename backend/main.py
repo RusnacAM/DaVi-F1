@@ -6,6 +6,7 @@ import numpy as np
 import os
 import math
 from scipy import interpolate
+from scipy.spatial import cKDTree
 
 from utils.sectors import sector_dict, label_dict, labels_spanish, labels_bahrain, labels_austria, labels_italy, labels_britian, labels_abuDhabi
 from typing import List
@@ -100,166 +101,141 @@ def get_gear_data(session_year: int, session_name: str, identifier: str, driver:
 
 
 @app.get("/api/v1/track-dominance")
-def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
+def get_track_dominance(
+    session_name: str, 
+    identifier: str,  
+    drivers: list[str] = Query(None), 
+    session_years: list[int] = Query(None)
+):
     telemetry_list = []
     
-    # Track overall fastest lap across all loaded laps
-    ref_lap_time = None
-    ref_lap_driver = None
-    ref_lap_year = None
-
-    fastest_lap_time = None
-    fastest_driver_overall = None
-    fastest_year_overall = None
+    # Tracking the actual fastest lap object for reference X/Y data
+    fastest_lap_object = None
+    global_fastest_time = None
+    
+    if not drivers or not session_years:
+        return []
 
     ### ---- Load telemetry data ---- ###
-
-    # Load all sessions and drivers' fastest laps
     for year in session_years:
         session_event = get_loaded_session(year, session_name, identifier)
+        
+        # Pre-load laps for all requested drivers in this session to avoid repeated filtering
+        driver_laps = session_event.laps.pick_drivers(drivers)
 
         for driver in drivers:
-            lap = session_event.laps.pick_drivers(driver).pick_fastest()
-
-            # skip if no lap found
-            if lap is None or getattr(lap, "empty", False):
+            # Extract specific driver's fastest lap safely
+            driver_lap = driver_laps.pick_drivers(driver).pick_fastest()
+            
+            # Check if valid lap exists
+            if pd.isna(driver_lap['LapTime']):
                 continue
 
-            # Record overall fastest lap
-            if 'LapTime' in lap.index:
-                lap_time = lap['LapTime']
-            else:
-                # fallback attribute access if structure differs
-                lap_time = getattr(lap, 'LapTime', None)
+            # Update Global Fastest Lap for Reference Telemetry
+            current_time = driver_lap['LapTime']
+            if global_fastest_time is None or current_time < global_fastest_time:
+                global_fastest_time = current_time
+                fastest_lap_object = driver_lap
 
-            if lap_time is not None and (fastest_lap_time is None or lap_time < fastest_lap_time):
-                fastest_lap_time = lap_time
-                fastest_driver_overall = driver
-                fastest_year_overall = year
-
-            if lap_time is not None and (ref_lap_time is None or ref_lap_time < lap_time):
-                ref_lap_time = lap_time
-                ref_lap_driver = driver
-                ref_lap_year = year
-
-            telemetry = lap.get_telemetry().add_distance()
+            # Process Telemetry
+            telemetry = driver_lap.get_telemetry().add_distance()
             telemetry["Driver"] = driver
             telemetry["Year"] = year
             telemetry["DriverYear"] = f"{driver}_{year}"
+            
+            # Keep only necessary columns to save memory
+            cols_to_keep = ['Date', 'SessionTime', 'Driver', 'Year', 'DriverYear', 'Distance', 'Speed', 'X', 'Y']
+            telemetry_list.append(telemetry[cols_to_keep])
 
-            telemetry_list.append(telemetry)
+    if not telemetry_list or fastest_lap_object is None:
+        return []
 
     # Concatenate all telemetry data
     telemetry_all = pd.concat(telemetry_list, ignore_index=True)
 
-    ref_lap = get_loaded_session(ref_lap_year, session_name, "FP2").laps.pick_driver(ref_lap_driver).pick_fastest()
-    reference_telemetry = ref_lap.get_telemetry().add_distance()
-    reference_telemetry["Driver"] = fastest_driver_overall
-    reference_telemetry["Year"] = fastest_year_overall
+    # Set Reference Telemetry (The actual spatial path of the fastest lap)
+    reference_telemetry = driver_lap.get_telemetry().add_distance()
+    # Note: We do not overwrite Driver/Year here to preserve the identity of the reference lap
 
-    if session_name in sector_dict.keys():
+    # ---- Mini Sector Logic ---- #
+    if session_name in sector_dict:
         sector_bounds = sector_dict[session_name]
     else:
         num_minisectors = 12
-        sector_bounds = [0] * (num_minisectors + 1)
         total_dist = telemetry_all['Distance'].max()
+        # Create n+1 linspace bounds
+        sector_bounds = np.linspace(0, total_dist, num_minisectors + 1)
 
-        for i in range(1, num_minisectors + 1):
-            sector_bounds[i] = math.ceil(i * (total_dist / num_minisectors))
-
+    # Assign Minisectors
     telemetry_all['Minisector'] = np.digitize(
         telemetry_all['Distance'], bins=sector_bounds, right=False
     )
-
-    avg_speed = (
-        telemetry_all
-        .groupby(['Minisector', 'DriverYear'])['Speed']
-        .mean()
-        .reset_index()
+    reference_telemetry['Minisector'] = np.digitize(
+        reference_telemetry['Distance'], bins=sector_bounds, right=False
     )
 
-    fastest = avg_speed.loc[
-        avg_speed.groupby('Minisector')['Speed'].idxmax()
-    ][['Minisector', 'DriverYear']].rename(columns={'DriverYear': 'Fastest'})
-
-    #---- Merge fastest driver into average speed ---- #
-    avg_speed = avg_speed.merge(
-        fastest, on='Minisector', how='left'
-    )
-
-    # Get the fastest speed per minisector
-    avg_speed['FastestSpeed'] = avg_speed.groupby('Minisector')['Speed'].transform('max')
-
-    # Get time spend in sector
-    avg_speed['SectorLength'] = 0
-    for i in range(1, len(sector_bounds)):
-        length = sector_bounds[i] - sector_bounds[i-1]
-        avg_speed.loc[avg_speed['Minisector'] == i, 'SectorLength'] = length
-
-    # Add sector labels
-    if session_name in label_dict.keys():
-        print("Using predefined labels")
+    # ---- Sector Labels ---- #
+    if session_name in label_dict:
         labels = label_dict.get(session_name, {})
-    #Assign labels according to minimum speed of minisector
     else:
-        print("Using automatic labels")
-        sector_speeds = (
-            telemetry_all
-            .groupby('Minisector')['Speed']
-            .min()
-            .reset_index()
-        )
-
-        print(sector_speeds)
-
+        # Calculate labels based on min speed in reference telemetry per sector
+        sector_speeds = reference_telemetry.groupby('Minisector')['Speed'].min()
         labels = {}
-        for _, row in sector_speeds.iterrows():
-            minisector = row['Minisector']
-            speed = row['Speed']
+        for minisector, speed in sector_speeds.items():
             if speed < 100:
                 labels[minisector] = 'Slow'
-            elif speed < 160:
+            elif speed < 200:
                 labels[minisector] = 'Medium'
-            elif speed < 220:
+            elif speed < 260:
                 labels[minisector] = 'Fast'
             else:
                 labels[minisector] = 'Straight'
 
-        print(labels)
-        
-    avg_speed['MinisectorLabel'] = avg_speed['Minisector'].map(labels)
+    # ---- Dominance Calculation ---- #
+    # Group by Sector and Driver, calculate Duration (Max SessionTime - Min SessionTime)
+    sector_times = telemetry_all.groupby(['Minisector', 'DriverYear'])['SessionTime'].agg(lambda x: x.max() - x.min()).reset_index()
+    sector_times.rename(columns={'SessionTime': 'TimeInSector'}, inplace=True)
+    
+    # Find Fastest Driver per Sector
+    idx_fastest = sector_times.groupby('Minisector')['TimeInSector'].idxmin()
+    fastest_per_sector = sector_times.loc[idx_fastest, ['Minisector', 'DriverYear', 'TimeInSector']]
+    fastest_per_sector.rename(columns={'DriverYear': 'Fastest', 'TimeInSector': 'FastestTime'}, inplace=True)
 
-    avg_speed['TimeInSector'] = (avg_speed['SectorLength'] / avg_speed['Speed'])  # time in seconds
-    avg_speed['FastestTimeInSector'] = (avg_speed['SectorLength'] / avg_speed['FastestSpeed'])  # time in seconds
+    # Calculate Average Time of Everyone excluding the fastest
+    # Merge fastest info back to sector times to exclude them from the mean calculation
+    sector_analysis = sector_times.merge(fastest_per_sector[['Minisector', 'Fastest']], on='Minisector')
     
-    # Find average time gain for fastest driver in each minisector
-    sector_means = avg_speed.groupby('Minisector').apply(
-    lambda x: x.loc[x['DriverYear'] != x['Fastest'], 'TimeInSector'].mean()
-    )
-    avg_speed['MeanTimeInSector'] = avg_speed['Minisector'].map(sector_means)
-    avg_speed['TimeGainFastest'] = avg_speed['MeanTimeInSector'] - avg_speed['FastestTimeInSector']
-    print(avg_speed.tail(20))
+    # Filter out the fastest driver to calculate the mean of the rest
+    others_times = sector_analysis[sector_analysis['DriverYear'] != sector_analysis['Fastest']]
     
-    reference_telemetry['Minisector'] = np.digitize(
-        reference_telemetry['Distance'], bins=sector_bounds, right=False
-    )
+    # Calculate Mean of others
+    mean_others = others_times.groupby('Minisector')['TimeInSector'].mean().reset_index()
+    mean_others.rename(columns={'TimeInSector': 'MeanTimeOthers'}, inplace=True)
+
+    # Consolidate Stats
+    stats_merged = fastest_per_sector.merge(mean_others, on='Minisector', how='left')
+    stats_merged['TimeGainFastest'] = stats_merged['MeanTimeOthers'] - stats_merged['FastestTime']
+    
+    # Handle cases where there is only 1 driver (MeanTimeOthers would be NaN)
+    stats_merged['TimeGainFastest'] = stats_merged['TimeGainFastest'].fillna(0)
+
+    # ---- Final Result Construction ---- #
+    
+    # Merge stats onto spatial reference
     result_telemetry = reference_telemetry.merge(
-        fastest, on='Minisector', how='left'
+        stats_merged[['Minisector', 'Fastest', 'TimeGainFastest']], 
+        on='Minisector', 
+        how='left'
     )
 
-    #Merge avg_speed in results telemetry
-    result_telemetry = result_telemetry.merge(
-        avg_speed[['Minisector', 'DriverYear', 'TimeGainFastest','MinisectorLabel']],
-        left_on=['Minisector', result_telemetry["Fastest"]],
-        right_on=['Minisector', 'DriverYear'],
-        how='left')
-    
-    print(result_telemetry['Fastest'].unique())
-    
-    result_telemetry["Driver"] = result_telemetry["Fastest"].apply(lambda x: x.split('_')[0])
-    result_telemetry["Year"] = result_telemetry["Fastest"].apply(lambda x: int(x.split('_')[1]))
+    # Map Labels
+    result_telemetry['Label'] = result_telemetry['Minisector'].map(labels)
 
+    # Parse Driver and Year from "Fastest" string
+    result_telemetry["Driver"] = result_telemetry["Fastest"].str.split('_').str[0]
+    result_telemetry["Year"] = result_telemetry["Fastest"].str.split('_').str[1].astype(int)
 
+    # Final selection
     result = pd.DataFrame({
         "x": result_telemetry["X"],
         "y": result_telemetry["Y"],
@@ -267,11 +243,12 @@ def get_track_dominance(session_name: str, identifier: str,  drivers: list[str] 
         "fastest": result_telemetry["Fastest"],
         "driver": result_telemetry["Driver"],
         "year": result_telemetry["Year"],
-        "TimeGainFastest": round(result_telemetry["TimeGainFastest"],4),
-        "Label": result_telemetry["MinisectorLabel"]
+        "TimeGainFastest": result_telemetry["TimeGainFastest"].round(3),
+        "Label": result_telemetry["Label"]
     })
 
     return result.to_dict(orient="records")
+
 
 
 
@@ -361,6 +338,7 @@ def braking_comparison(
     
     return result
 
+
 @app.get("/api/v1/braking-distribution")
 def get_braking_distribution(
     session_year: str, 
@@ -405,241 +383,288 @@ def get_braking_distribution(
     return {"data": output}
     return result.to_dict(orient="records")
 
+
 @app.get("/api/v1/AvgDiffs")
-def get_average_loss_to_fastest(session_name: str, identifier: str,  drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
+def get_average_loss_to_fastest(session_name: str, identifier: str, drivers: list[str] = Query(None), session_years: list[int] = Query(None)):
     telemetry_list = []
     
-    # Track overall fastest lap across all loaded laps
-    fastest_lap_time = None
+    # Track overall fastest lap
+    fastest_lap_object = None
+    global_fastest_time = None
+    
+    # Store fastest driver/year strings for final merging
     fastest_driver_overall = None
     fastest_year_overall = None
 
-    ### ---- Load telemetry data ---- ###
+    if not drivers or not session_years:
+        return []
 
-    # Load all sessions and drivers' fastest laps
+    ### ---- Load telemetry data ---- ###
     for year in session_years:
         session_event = get_loaded_session(year, session_name, identifier)
+        driver_laps = session_event.laps.pick_drivers(drivers)
 
         for driver in drivers:
-            lap = session_event.laps.pick_drivers(driver).pick_fastest()
+            lap = driver_laps.pick_drivers(driver).pick_fastest()
+            current_time = lap['LapTime']
 
-            # skip if no lap found
-            if lap is None or getattr(lap, "empty", False):
-                continue
-
-            # Record overall fastest lap
-            if 'LapTime' in lap.index:
-                lap_time = lap['LapTime']
-            else:
-                # fallback attribute access if structure differs
-                lap_time = getattr(lap, 'LapTime', None)
-
-            if lap_time is not None and (fastest_lap_time is None or lap_time < fastest_lap_time):
-                fastest_lap_time = lap_time
+            if global_fastest_time is None or current_time < global_fastest_time:
+                global_fastest_time = current_time
+                fastest_lap_object = lap
                 fastest_driver_overall = driver
                 fastest_year_overall = year
 
             telemetry = lap.get_telemetry().add_distance()
-
             telemetry["Driver"] = driver
             telemetry["Year"] = year
             telemetry["DriverYear"] = f"{driver}_{year}"
 
-            telemetry_list.append(telemetry)
+            # Only keep columns needed for calculation
+            cols = ['SessionTime', 'Distance', 'Speed', 'DriverYear']
+            telemetry_list.append(telemetry[cols])
+
+    if not telemetry_list or fastest_lap_object is None:
+        return []
 
     # Concatenate all telemetry data
     telemetry_all = pd.concat(telemetry_list, ignore_index=True)
 
-    ### ---- Get mini sectors, labels added later ---- ###
+    # Get correct reference telemetry (from the actual fastest lap)
+    reference_telemetry = lap.get_telemetry().add_distance()
 
-    # Create minisectors based on predefined sector bounds or equal divisions
-    if session_name in sector_dict.keys():
+    ### ---- Get mini sectors ---- ###
+    if session_name in sector_dict:
         sector_bounds = sector_dict[session_name]
     else:
         num_minisectors = 12
-        sector_bounds = [0] * (num_minisectors + 1)
         total_dist = telemetry_all['Distance'].max()
+        sector_bounds = np.linspace(0, total_dist, num_minisectors + 1)
 
-        for i in range(1, num_minisectors + 1):
-            sector_bounds[i] = math.ceil(i * (total_dist / num_minisectors))
-
+    # Digitize both all telemetry and the reference telemetry
     telemetry_all['Minisector'] = np.digitize(
         telemetry_all['Distance'], bins=sector_bounds, right=False
     )
-
-
-    # Get sector lengths
-    sector_lengths = []
-    for i in range(1, len(sector_bounds)):
-        sector_lengths.append(sector_bounds[i] - sector_bounds[i-1])
-    sector_length_df = pd.DataFrame({
-        'Minisector': list(range(1, len(sector_bounds))),
-        'SectorLength': sector_lengths
-    })
-
-    ### ---- Calculate average time and time loss to fastest driver per minisector ---- ### 
-
-    print("Get average speed per driver per minisector")
-    # Get average speed per driver per minisector
-    avg_speed = (
-        telemetry_all
-        .groupby(['Minisector', 'DriverYear'])['Speed']
-        .mean()
-        .reset_index()
+    
+    reference_telemetry['Minisector'] = np.digitize(
+        reference_telemetry['Distance'], bins=sector_bounds, right=False
     )
 
-    print("Label minisectors")
-    # Add sector labels
-    if session_name in label_dict.keys():
-        print("Using predefined labels")
+    ### ---- Add mini sector labels ---- ### 
+    if session_name in label_dict:
         labels = label_dict.get(session_name, {})
-
-    #Assign labels according to minimum speed of minisector
     else:
-        print("Calculating labels based on speed")
-        sector_speeds = (
-            telemetry_all
-            .groupby('Minisector')['Speed']
-            .min()
-            .reset_index()
-        )
-
-
+        # Calculate labels based on the VALID reference telemetry
+        sector_speeds = reference_telemetry.groupby('Minisector')['Speed'].min()
 
         labels = {}
-        for _, row in sector_speeds.iterrows():
-            minisector = row['Minisector']
-            speed = row['Speed']
-            if speed < 100:
+        for minisector, speed in sector_speeds.items():
+            if speed < 110:
                 labels[minisector] = 'Slow'
-            elif speed < 160:
+            elif speed < 200:
                 labels[minisector] = 'Medium'
-            elif speed < 220:
+            elif speed < 260:
                 labels[minisector] = 'Fast'
             else:
                 labels[minisector] = 'Straight'
-        
-    avg_speed['MinisectorLabel'] = avg_speed['Minisector'].map(labels)
 
-    # Transform speed to time per sector (in seconds)
-    avg_speed = avg_speed.merge(sector_length_df, on='Minisector')
-    avg_speed['Speed'] = avg_speed['Speed']/3.6 # convert to m/s
-    avg_speed['Time_sec'] = avg_speed['SectorLength'] / avg_speed['Speed']
+    # Add labels to main dataframe
+    telemetry_all['MinisectorLabel'] = telemetry_all['Minisector'].map(labels)
 
-
-    # Find speed difference per minisector to overall fastest driver
-    avg_speed = avg_speed.merge(
-        avg_speed[avg_speed['DriverYear'] == f"{fastest_driver_overall}_{fastest_year_overall}"][['Minisector', 'Time_sec']],
-        on='Minisector',
-        suffixes=('', '_Fastest')
+    ### ---- Calculate Time Spent per Sector ---- ###
+    sector_analysis = (
+        telemetry_all
+        .groupby(['Minisector', 'MinisectorLabel', 'DriverYear'])['SessionTime']
+        .agg(lambda x: x.max() - x.min())
+        .dt.total_seconds()
+        .reset_index()
+        .rename(columns={'SessionTime': 'Time_sec'})
     )
 
-    avg_speed['Diff_to_Fastest_sec'] =  avg_speed['Time_sec'] - avg_speed['Time_sec_Fastest']
+    ### ---- Calculate Diff to Fastest ---- ###
 
-    #Find the average time loss per minisector label for each driver
-    avg_speed = (
-        avg_speed
-        .groupby(['DriverYear','MinisectorLabel'])['Diff_to_Fastest_sec']
+    # Identify the unique string for the fastest driver
+    fastest_str = f"{fastest_driver_overall}_{fastest_year_overall}"
+
+    # Extract fastest driver times
+    fastest_times = sector_analysis[sector_analysis['DriverYear'] == fastest_str][['Minisector', 'Time_sec']]
+    
+    # Merge fastest times back into the main dataframe
+    sector_analysis = sector_analysis.merge(
+        fastest_times,
+        on='Minisector',
+        suffixes=('', '_Fastest'),
+        how='left'
+    )
+
+    # Calculate difference
+    sector_analysis['Diff_to_Fastest_sec'] = sector_analysis['Time_sec'] - sector_analysis['Time_sec_Fastest']
+
+    ### ---- Aggregate by Label ---- ###
+    # Find the average time loss per minisector label for each driver
+    result_df = (
+        sector_analysis
+        .groupby(['MinisectorLabel', 'DriverYear'])['Diff_to_Fastest_sec']
         .mean()
         .reset_index()
     )
 
-    avg_speed['FastestOverallDriver'] = fastest_driver_overall
-    avg_speed['FastestOverallYear'] = fastest_year_overall
+    # Add metadata columns
+    result_df['FastestOverallDriver'] = fastest_driver_overall
+    result_df['FastestOverallYear'] = fastest_year_overall
 
-    return avg_speed.to_dict(orient='records')
+    return result_df.to_dict(orient='records')
 
 
 @app.get("/api/v1/lap-gap-evolution")
-def get_lap_gap_evolution(session_name: str, identifier: str,  drivers: List[str] = Query(None), session_years: List[int] = Query(None)):
-    fastest_laps = {}
-    telemetry_data = {}
+def get_lap_gap_evolution(
+    session_name: str, 
+    identifier: str,  
+    drivers: List[str] = Query(None), 
+    session_years: List[int] = Query(None)
+):
+    # Container to hold valid lap data
+    lap_data_list = []
+    
+    # Tracking reference info
+    global_fastest_time = None
+    ref_index = -1 
+
+    ### ---- Load Data ---- ###
+    if not drivers or not session_years:
+        return {"lapGaps": {}, "corners": []}
 
     for year in session_years:
-        session = get_loaded_session(year, session_name, identifier)
-        for driver in drivers:
-            lap = session.laps.pick_drivers(driver).pick_fastest()
+        try:
+            session_event = get_loaded_session(year, session_name, identifier)
+            driver_laps = session_event.laps.pick_drivers(drivers)
 
-            if lap is None or len(lap) == 0:
-                continue
-            
-            fastest_laps[(driver, year)] = lap['LapTime']
+            for driver in drivers:
+                lap = driver_laps.pick_drivers(driver).pick_fastest()
 
-            telemetry = lap.get_telemetry().add_distance()
-            telemetry['Driver'] = driver
-            telemetry['Year'] = year
-            telemetry['DriverYear'] = f"{driver} {year}"
-
-            telemetry_data[f"{driver} {year}"] = telemetry.reset_index(drop=True) 
-
-    reference_driver_year = min(fastest_laps, key=fastest_laps.get)
-    reference_driver_year = f"{reference_driver_year[0]} {reference_driver_year[1]}"
-    ref_tel = telemetry_data[reference_driver_year]
-    common_distance = ref_tel['Distance'].values
-
-        
-    # Store interpolated speed data
-    interpolated_speeds = {}
-        
-    # Interpolate all drivers to common distance points
-    for driver_year in telemetry_data.keys():
-        tel = telemetry_data[driver_year]
+                if pd.isna(lap['LapTime']):
+                    continue
                 
-        if len(tel['Distance']) > 10:
-            f_speed = interpolate.interp1d(
-                tel['Distance'], tel['Speed'],
-                kind='linear', bounds_error=False, 
-                fill_value='extrapolate'
-            )
-            interpolated_speeds[driver_year] = f_speed(common_distance)
+                lap_time = lap['LapTime']
+                telemetry = lap.get_telemetry().add_distance()
+                
+                entry = {
+                    "driver": driver,
+                    "year": year,
+                    "driver_year": f"{driver} {year}", 
+                    "time": lap_time,
+                    "x_coord": telemetry['X'].values,
+                    "y_coord": telemetry['Y'].values,
+                    "distance": telemetry['Distance'].values,
+                    "time_series": telemetry['Time'].dt.total_seconds().values,
+                    "session": session_event 
+                }
+                
+                lap_data_list.append(entry)
+
+                if global_fastest_time is None or lap_time < global_fastest_time:
+                    global_fastest_time = lap_time
+                    ref_index = len(lap_data_list) - 1
+        except Exception as e:
+            print(f"Error processing {year}: {e}")
+            continue
+
+    if not lap_data_list or ref_index == -1:
+        return {"lapGaps": {}, "corners": []}
+
+    ### ---- Prepare Reference Data ---- ###
+    reference_entry = lap_data_list[ref_index]
+    ref_time_series = reference_entry["time_series"]
+    ref_distance = reference_entry["distance"]
+    ref_id = reference_entry["driver_year"]
     
-    time_diff_list = []
+    # KDTree for spatial matching
+    ref_coords = np.column_stack((reference_entry["x_coord"], reference_entry["y_coord"]))
+    ref_tree = cKDTree(ref_coords)
 
-    # Calculate cumulative time differences
     result = {}
-    if reference_driver_year in interpolated_speeds:
-        ref_speed = interpolated_speeds[reference_driver_year]
-                
-        for driver_year in interpolated_speeds.keys():
-            if driver_year != reference_driver_year:
-                driver_speed = interpolated_speeds[driver_year]
-                        
-                # Calculate distance segments
-                distance_segments = np.diff(common_distance)
-                distance_segments = np.append(distance_segments, distance_segments[-1])
-                    
-                # Prevent division by zero
-                ref_speed_safe = np.maximum(ref_speed, 1.0)
-                driver_speed_safe = np.maximum(driver_speed, 1.0)
-                        
-                # Time calculation: t = d / v (convert km/h to m/s)
-                ref_time_segments = distance_segments / (ref_speed_safe / 3.6)
-                driver_time_segments = distance_segments / (driver_speed_safe / 3.6)
-                    
-                # Cumulative time difference
-                time_diff = np.cumsum(driver_time_segments - ref_time_segments)
-                time_diff_list.append(time_diff)
-
-                lap_gap = pd.DataFrame({
-                "x": common_distance.tolist(),
-                "y": time_diff.tolist(),
-                "driver": driver_year[:3],
-                "year": int(driver_year[-4:])
-                }).astype(object)
+    
+    # Configuration
+    TARGET_POINTS = 800  # Number of points to plot
+    SMOOTHING_WINDOW = 15 # Filter strength (Higher = Smoother but less detail)
+    
+    ### ---- Calculate Gaps ---- ###
+    for entry in lap_data_list:
+        driver_year = entry["driver_year"]
+        
+        if driver_year == ref_id:
+            continue
             
-                result[driver_year] = lap_gap.to_dict(orient="records")
+        d_x = entry["x_coord"]
+        d_y = entry["y_coord"]
+        d_dist = entry["distance"]
+        d_time = entry["time_series"]
+        
+        # 1. Downsample INPUT data (optimization)
+        if len(d_x) > TARGET_POINTS:
+            step = len(d_x) // TARGET_POINTS
+            d_x = d_x[::step]
+            d_y = d_y[::step]
+            d_dist = d_dist[::step]
+            d_time = d_time[::step]
 
-
-    circuit_info = session.get_circuit_info()
-
-    all_diffs = np.concatenate(time_diff_list)
-
-    corners = []
-    for _, corner in circuit_info.corners.iterrows():
-        corners.append({
-            "distance": float(corner["Distance"]),
-            "label": f"{corner['Number']}{corner['Letter']}",
+        driver_coords = np.column_stack((d_x, d_y))
+        
+        # 2. Spatial Query
+        dists, indices = ref_tree.query(driver_coords, k=2)
+        
+        # 3. Disambiguate Matches (Fix crossovers/bridges)
+        idx_0 = indices[:, 0]
+        idx_1 = indices[:, 1]
+        
+        ref_d_0 = ref_distance[idx_0]
+        ref_d_1 = ref_distance[idx_1]
+        
+        delta_0 = np.abs(ref_d_0 - d_dist)
+        delta_1 = np.abs(ref_d_1 - d_dist)
+        
+        use_second = (delta_0 > 500) & (delta_1 < 500)
+        chosen_indices = np.where(use_second, idx_1, idx_0)
+        
+        # 4. Calculate Raw Gap
+        ref_time_at_match = ref_time_series[chosen_indices]
+        gap_series_raw = d_time - ref_time_at_match
+        
+        # 5. Apply Smoothing (Moving Average)
+        # This removes the jagged noise seen in your screenshot
+        gap_series_smooth = pd.Series(gap_series_raw).rolling(
+            window=SMOOTHING_WINDOW, 
+            center=True, 
+            min_periods=1
+        ).mean().values
+        
+        x_axis_dist = ref_distance[chosen_indices]
+        
+        lap_gap = pd.DataFrame({
+            "x": x_axis_dist,
+            "y": gap_series_smooth,
+            "driver": driver_year[:3], 
+            "year": int(entry["year"])
         })
+
+        lap_gap = lap_gap.sort_values(by="x").dropna()
+        
+        # Remove finish line artifact
+        if not lap_gap.empty:
+            lap_gap = lap_gap.iloc[:-1]
+    
+        result[driver_year] = lap_gap.to_dict(orient="records")
+
+    ### ---- Get Circuit Info ---- ###
+    ref_session = reference_entry["session"]
+    circuit_info = ref_session.get_circuit_info()
+    
+    corners = []
+    if circuit_info is not None:
+        for _, corner in circuit_info.corners.iterrows():
+            corners.append({
+                "distance": float(corner["Distance"]),
+                "label": f"{corner['Number']}{corner['Letter']}",
+            })
 
     return {
         "lapGaps": result,

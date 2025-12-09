@@ -20,9 +20,9 @@ export const FilterConfigsProvider: React.FC<{
   children,
 }) => {
 
-    const [sessionYears, setSessionYears] = useState<string[]>(["2021","2022"]);
-    const [sessionName, setSessionName] = useState<string>("Bahrain Grand Prix");
-    const [sessionIdentifier, setSessionIdentifier] = useState<string>("Race")
+    const [sessionYears, setSessionYears] = useState<string[]>(["2025"]);
+    const [sessionName, setSessionName] = useState<string>("United States Grand Prix");
+    const [sessionIdentifier, setSessionIdentifier] = useState<string>("Qualifying")
     const [driverNames, setDriverNames] = useState<string[]>(["Max Verstappen", "Lando Norris"]);
 
     return (
