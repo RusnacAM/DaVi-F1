@@ -1,24 +1,90 @@
-.visualization-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100vh;
-  width: 100%;
+.root-container {
+  padding: 20px;
+  color: white;
+  background-color: #151519;
 }
 
-.navbar {
-  text-align: center;
-  font-size: 2rem;
-  color: #fff;
-  padding: 1rem;
-  border-bottom: 2px rgb(68, 66, 66) solid;
+.sidebar {
+  width: 300px !important;
+  background-color: #151519 !important;
+  border-radius: 0px 20px 20px 0px !important;
+  padding: 15px;
+  box-shadow: 5px 2px 20px rgba(255, 255, 255, 0.2) !important;
+}
+
+.filter-menu {
+  box-sizing: border-box;
+  height: 100%; 
+  padding: 10px;
+  margin-bottom: 25px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .filters {
   display: flex;
-  flex-direction: row;
-  gap: 1rem;
-  padding: 0px 10px;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.filter-select {
+  color: inherit !important;
+  border-radius: 8px !important;
+  outline: none !important;
+  font-size: 14px;
+}
+
+.filter-select .filter-label {
+  position: static;
+  transform: none;       
+  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+}
+
+.filter-select .MuiSelect-select {
+  color: white !important;
+  border-radius: 4px !important;
+  position: relative;
+  border: 1px solid #ced4da !important;
+  padding: 10px 26px 10px 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.filter-select .MuiSelect-select:hover {
+  background-color: initial !important;
+  border-color: #ced4da !important;
+  box-shadow: none !important;  
+}
+
+.MuiOutlinedInput-root:hover,
+.MuiFilledInput-root:hover,
+.MuiInputBase-root:hover {
+  border-color: #ced4da !important;
+  box-shadow: none !important;  
+}
+
+.MuiSelect-select:hover {
+  background-color: inherit !important;
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: #ced4da !important;
+}
+
+.MuiOutlinedInput-root:hover {
+  background-color: inherit !important;
+}
+
+.MuiSelect-select:hover {
+  background-color: inherit !important;
+}
+
+.MuiSelect-icon {
+  color: white !important;
+  fill: white !important;
 }
 
 .legend-container {
@@ -26,7 +92,6 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  padding-top: 10px;
   gap: 15px;
 }
 

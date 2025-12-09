@@ -2,44 +2,52 @@ import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import type React from "react";
-import { FormControl } from "@mui/material";
+import { FormControl, InputLabel } from "@mui/material";
 
 interface FilterSelectProps {
   value: string;
   setValue: (eventVal: string) => void;
   menuItems: string[];
-  width: number;
+  label: string;
 }
 
 export const FilterSelect: React.FC<FilterSelectProps> = ({
   value,
   setValue,
   menuItems,
-  width,
+  label,
 }) => {
   const handleChange = (event: SelectChangeEvent) => {
     setValue(event.target.value as string);
   };
 
   return (
-    <FormControl>
+    <FormControl className="filter-select" fullWidth>
+      <InputLabel
+        id="session-year-label"
+        className="filter-label"
+        shrink={false}
+      >
+        {label}
+      </InputLabel>
       <Select
         id="session-year-select"
         value={value}
         onChange={handleChange}
-        className="filter-select"
-        sx={{
-          width: width,
-          textAlign: "center",
-          height: 40,
-          padding: "15px",
-          borderRadius: "4px",
-          boxShadow: "rgb(82, 82, 82) 0.1rem 0.1rem 0.3rem",
-          border: "2px solid rgb(82, 82, 82)",
-          color: "white",
-          backgroundColor: "rgb(25, 27, 31)",
-          "& .MuiSvgIcon-root": {
-            color: "white",
+        MenuProps={{
+          PaperProps: {
+            style: {
+              maxHeight: 400,
+              overflowY: "auto",
+            },
+          },
+          anchorOrigin: {
+            vertical: "bottom",
+            horizontal: "left",
+          },
+          transformOrigin: {
+            vertical: "top",
+            horizontal: "left",
           },
         }}
       >
