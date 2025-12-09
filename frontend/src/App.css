@@ -1,24 +1,105 @@
-.visualization-container {
+.root-container {
+  color: white;
+  background-color: #151519;
   display: flex;
   flex-direction: column;
-  align-items: center;
   height: 100vh;
-  width: 100%;
 }
 
-.navbar {
-  text-align: center;
-  font-size: 2rem;
-  color: #fff;
-  padding: 1rem;
-  border-bottom: 2px rgb(68, 66, 66) solid;
+.top-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+}
+
+.sidebar {
+  width: 300px !important;
+  background-color: #151519 !important;
+  border-radius: 0px 20px 20px 0px !important;
+  padding: 15px;
+  box-shadow: 5px 2px 20px rgba(255, 255, 255, 0.2) !important;
+}
+
+.filter-menu {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 10px;
+  margin-bottom: 25px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .filters {
   display: flex;
-  flex-direction: row;
-  gap: 1rem;
-  padding: 0px 10px;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.filter-select {
+  color: inherit !important;
+  border-radius: 8px !important;
+  outline: none !important;
+  font-size: 14px;
+}
+
+.filter-select .filter-label {
+  position: static;
+  transform: none;
+  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+}
+
+.filter-select .MuiSelect-select {
+  color: white !important;
+  border-radius: 4px !important;
+  position: relative;
+  border: 1px solid #ced4da !important;
+  padding: 10px 26px 10px 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.filter-select .MuiSelect-select:hover {
+  background-color: initial !important;
+  border-color: #ced4da !important;
+  box-shadow: none !important;
+}
+
+.MuiOutlinedInput-root:hover,
+.MuiFilledInput-root:hover,
+.MuiInputBase-root:hover {
+  border-color: #ced4da !important;
+  box-shadow: none !important;
+}
+
+.MuiSelect-select:hover {
+  background-color: inherit !important;
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: #ced4da !important;
+}
+
+.MuiOutlinedInput-root:hover {
+  background-color: inherit !important;
+}
+
+.MuiSelect-select:hover {
+  background-color: inherit !important;
+}
+
+.MuiSelect-icon {
+  color: white !important;
+  fill: white !important;
+}
+
+.MuiMenuItem-root.Mui-selected {
+  background-color: rgb(68, 68, 76) !important;
+  color: white !important;
 }
 
 .legend-container {
@@ -26,8 +107,11 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  padding-top: 10px;
-  gap: 15px;
+  gap: 10px;
+}
+
+.legend-color-block span {
+  font-size: 14px;
 }
 
 .legend-color-block {
@@ -35,35 +119,35 @@
   align-items: center;
 }
 
+.viz-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
 .chart-container {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  margin: 25px;
   gap: 10px;
+  width: 100%;
+  height: 100%;
 }
 
 .track-map {
-  width: 600px;
-  height: 600px;
-  flex-shrink: 0;
+  flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.AvgDiffs-Chart {
-  width: 900px;
-  height: 330px;
+.supporting-charts {
+  flex: 1;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.lap-gap-evolution {
-  width: 900px;
-  height: 330px;
+.avg-diffs-chart,
+.lap-gap-evolution-chart {
+  flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
