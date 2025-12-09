@@ -28,11 +28,11 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
     const trackGroup = svg
       .append("g")
       .attr("class", "track-group")
-      .attr("transform", "translate(100, 0)");
+      .attr("transform", "translate(10, 0)");
 
     //  --- Track ---
     const width = 500;
-    const height = 500;
+    const height = 600;
     const margin = 10;
 
     const xExtent = d3.extent(data, (d) => d.x) as [number, number];
@@ -113,5 +113,5 @@ export const TrackDominance: React.FC<TrackDominanceProps> = ({
     }
   }, [data]);
 
-  return <svg ref={svgRef} width={675} height={500}></svg>;
+  return <svg ref={svgRef} width={540} height={600}></svg>;
 };
