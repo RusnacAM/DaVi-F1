@@ -1,6 +1,6 @@
-import { Box, Button, Tab, Tabs } from "@mui/material";
-import { FilterSelect } from "../FilterSelect";
-import { MultiSelect } from "../MultiSelect";
+import { Button } from "@mui/material";
+import { FilterSelect } from "./FilterSelect";
+import { MultiSelect } from "./MultiSelect";
 import useFilterConfigs from "../../hooks/useFilterConfigs";
 import {
   DRIVERS,
@@ -24,8 +24,6 @@ const FilterMenu: React.FC<FilterMenuProps> = ({ onClickSelect }) => {
     setSessionName,
     sessionIdentifier,
     setSessionIdentifier,
-    tabValue,
-    setTabValue
   } = useFilterConfigs();
 
   // the session names intersection over all the selected years
@@ -63,56 +61,50 @@ const FilterMenu: React.FC<FilterMenuProps> = ({ onClickSelect }) => {
     );
   }, [sessionYears, sessionName, sessionIdentifier, driverNames]);
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
-
   return (
-    <div className="filters">
-      <MultiSelect
-        value={sessionYears}
-        setValue={setSessionYears}
-        menuItems={YEARS}
-        width={120}
-      />
+    <div className="filter-menu">
+      <div className="filters">
+        <MultiSelect
+          value={sessionYears}
+          setValue={setSessionYears}
+          menuItems={YEARS}
+          label={"Session Years"}
+          selectLimit={2}
+        />
 
-      <FilterSelect
-        value={sessionName}
-        setValue={setSessionName}
-        menuItems={commonSessionNames}
-        width={220}
-      />
+        <FilterSelect
+          value={sessionName}
+          setValue={setSessionName}
+          menuItems={commonSessionNames}
+          label={"GP Name"}
+        />
 
-      <FilterSelect
-        value={sessionIdentifier}
-        setValue={setSessionIdentifier}
-        menuItems={SESSION_IDENTIFIERS}
-        width={150}
-      />
+        <FilterSelect
+          value={sessionIdentifier}
+          setValue={setSessionIdentifier}
+          menuItems={SESSION_IDENTIFIERS}
+          label={"Identifier"}
+        />
 
-      <MultiSelect
-        value={driverNames}
-        setValue={setDriverNames}
-        menuItems={commonDriverNames}
-        width={200}
-      />
-
-      <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Tabs value={tabValue} onChange={handleTabChange} textColor="inherit">
-          <Tab label="Track Dominance" value={0} sx={{ color: "white" }} />
-          <Tab label="Braking" value={1} sx={{ color: "white" }} />
-        </Tabs>
-      </Box>
-
+        <MultiSelect
+          value={driverNames}
+          setValue={setDriverNames}
+          menuItems={commonDriverNames}
+          label={"Drivers"}
+          selectLimit={10}
+        />
+      </div>
       <Button
         variant="contained"
         onClick={onClickSelect}
         disabled={selectButtonDisabled}
         sx={{
-          marginLeft: "auto",
+          padding: "10px 20px",
+          borderRadius: "8px",
+          fontSize: "14px",
         }}
       >
-        Select
+        Filter
       </Button>
     </div>
   );

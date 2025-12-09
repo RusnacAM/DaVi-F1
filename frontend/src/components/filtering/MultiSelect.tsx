@@ -2,45 +2,67 @@ import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import type React from "react";
-import { FormControl } from "@mui/material";
+import { FormControl, InputLabel } from "@mui/material";
 
 interface MultiSelectProps {
   value: string[];
   setValue: (eventVal: string[]) => void;
   menuItems: string[];
-  width: number;
+  label: string;
+  selectLimit: number;
 }
 
 export const MultiSelect: React.FC<MultiSelectProps> = ({
   value,
   setValue,
   menuItems,
-  width,
+  label,
+  selectLimit,
 }) => {
   const handleChange = (event: SelectChangeEvent<typeof value>) => {
-    setValue(event.target.value as string[]);
+    if (event.target.value.length > selectLimit) {
+      const yearList = [
+        ...value.slice(0, selectLimit - 1),
+        event.target.value[event.target.value.length - 1],
+      ];
+      setValue(yearList);
+    } else {
+      setValue(event.target.value as string[]);
+    }
   };
 
   return (
-    <FormControl>
+    <FormControl className="filter-select">
+      <InputLabel
+        id="session-year-label"
+        className="filter-label"
+        shrink={false}
+      >
+        {label}
+      </InputLabel>
       <Select
         id="session-year-select"
         value={value}
         onChange={handleChange}
         multiple
-        className="filter-select"
-        sx={{
-          width: width,
-          textAlign: "center",
-          height: 40,
-          padding: "15px",
-          borderRadius: "4px",
-          boxShadow: "rgb(82, 82, 82) 0.1rem 0.1rem 0.3rem",
-          border: "2px solid rgb(82, 82, 82)",
-          color: "white",
-          backgroundColor: "rgb(25, 27, 31)",
-          "& .MuiSvgIcon-root": {
-            color: "white",
+        renderValue={(selected) => selected.join(", ")}
+        MenuProps={{
+          PaperProps: {
+            style: {
+              maxHeight: 350,
+              overflowY: "auto",
+              backgroundColor: "#2a2a30ff",
+              color: "white",
+              borderRadius: "8px",
+            },
+          },
+          anchorOrigin: {
+            vertical: "bottom",
+            horizontal: "left",
+          },
+          transformOrigin: {
+            vertical: "top",
+            horizontal: "left",
           },
         }}
       >

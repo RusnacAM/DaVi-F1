@@ -29,8 +29,8 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove();
 
-        const width = 900;
-        const height = 350;
+        const width = 800;
+        const height = 325;
         const margin = { top: 50, right: 100, bottom: 50, left: 70 };
         const innerWidth = width - margin.left - margin.right;
         const innerHeight = height - margin.top - margin.bottom;
@@ -65,19 +65,6 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
 
         const colorScale = (fastest: string) => getDriverYearColor(fastest, driverColorMap, sessionYears);
 
-        // Axes
-        // g.append("g")
-        //     .attr("transform", `translate(0,${innerHeight})`)
-        //     .call(d3.axisBottom(xScale))
-        //     .append("text")
-        //     .style("font-size", "14px")
-        //     .style("font-weight", "bold")
-        //     .attr("x", innerWidth / 2)
-        //     .attr("y", 40)
-        //     .attr("fill", "white")
-        //     .attr("text-anchor", "middle")
-        //     .text("");
-
         // X Axis
         g.append("g")
             .attr("transform", `translate(0,${innerHeight})`)
@@ -95,18 +82,6 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
             .style("font-weight", "bold")
             .style("fill", "#fff")
             .text("Track Distance (m)");
-
-        // g.append("g")
-        //     .call(d3.axisLeft(yScale))
-        //     .append("text")
-        //     .style("font-size", "14px")
-        //     .style("font-weight", "bold")
-        //     .attr("transform", "rotate(-90)")
-        //     .attr("x", -innerHeight / 2)
-        //     .attr("y", -45)
-        //     .attr("fill", "white")
-        //     .attr("text-anchor", "middle")
-        //     .text("Time Difference (s)");
 
         // Y Axis
         g.append("g")
@@ -257,5 +232,5 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
         });
     }, [lapGaps, corners]);
 
-    return <svg ref={svgRef} width={900} height={350}></svg>;
+    return <svg ref={svgRef} width={800} height={325}></svg>;
 };

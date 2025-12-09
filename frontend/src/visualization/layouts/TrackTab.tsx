@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import * as d3 from "d3";
 import {
   fetchTrackDominance,
   type TrackDominanceResponse,
@@ -13,10 +12,6 @@ import {
 import { CircularProgress } from "@mui/material";
 import { fetchAvgDiffs, type AvgDiffsResponse } from "../../api/fetchAvgDiffs";
 import { AvgDiffsChart } from "../AvgDiffs";
-import {
-  driverCode,
-  getDriverYearColor,
-} from "../../utils/configureFilterData";
 
 export interface TrackTabProps {
   sessionYears: string[];
@@ -24,6 +19,7 @@ export interface TrackTabProps {
   sessionIdentifier: string;
   driverNames: string[];
   refreshKey: number;
+  driverColorMap: Record<string, string>;
 }
 
 export const TrackTab: React.FC<TrackTabProps> = ({
@@ -32,21 +28,16 @@ export const TrackTab: React.FC<TrackTabProps> = ({
   sessionIdentifier,
   driverNames,
   refreshKey,
+  driverColorMap,
 }) => {
   const [data, setData] = useState<TrackDominanceResponse>([]);
   const [AvgDiffsData, setDataAvgDiffs] = useState<AvgDiffsResponse>([]);
-  const [data_lap_gap_evolution, setDataLapGapEvolution] = useState<LapGapEvolutionResponse>({
-    lapGaps: {},
-    corners: []
-  });
+  const [data_lap_gap_evolution, setDataLapGapEvolution] =
+    useState<LapGapEvolutionResponse>({
+      lapGaps: {},
+      corners: [],
+    });
   const [loadingState, setLoadingState] = useState(false);
-
-  const driverCodes = driverNames.map((d) => driverCode[d]);
-  const baseColors = d3.schemeTableau10;
-  const driverColorMap: Record<string, string> = {};
-  driverCodes.forEach((code, i) => {
-    driverColorMap[code] = baseColors[i % baseColors.length];
-  });
 
   const fetchData = async () => {
     try {
@@ -87,40 +78,24 @@ export const TrackTab: React.FC<TrackTabProps> = ({
   }, [refreshKey]);
 
   return (
-    <>
-      <div className="legend-container" style={{ marginBottom: "20px" }}>
-        {driverNames.flatMap((driverName) => {
-          const code = driverCode[driverName];
-
-          return sessionYears.map((year) => {
-            const key = `${code}_${year}`;
-            const color = getDriverYearColor(key, driverColorMap, sessionYears);
-
-            return (
-              <div className="legend-color-block">
-                <div
-                  style={{
-                    width: "14px",
-                    height: "14px",
-                    backgroundColor: color,
-                    borderRadius: "3px",
-                    marginRight: "6px",
-                  }}
-                />
-                <span>
-                  {code} {year}
-                </span>
-              </div>
-            );
-          });
-        })}
+    <div className="chart-container">
+      <div className="track-map">
+        {data && !loadingState ? (
+          <TrackDominance
+            data={data}
+            sessionYears={sessionYears}
+            driverColorMap={driverColorMap}
+          />
+        ) : (
+          <CircularProgress size={50} color="primary" />
+        )}
       </div>
 
-      <div className="chart-container">
-        <div className="track-map">
-          {data && !loadingState ? (
-            <TrackDominance
-              data={data}
+      <div className="supporting-charts">
+        <div className="avg-diffs-chart">
+          {AvgDiffsData && !loadingState ? (
+            <AvgDiffsChart
+              data={AvgDiffsData}
               sessionYears={sessionYears}
               driverColorMap={driverColorMap}
             />
@@ -129,33 +104,19 @@ export const TrackTab: React.FC<TrackTabProps> = ({
           )}
         </div>
 
-        <div className="supporting-chart">
-          <div className="AvgDiffs-Chart">
-            {AvgDiffsData && !loadingState ? (
-              <AvgDiffsChart
-                data={AvgDiffsData}
-                sessionYears={sessionYears}
-                driverColorMap={driverColorMap}
-              />
-            ) : (
-              <CircularProgress size={50} color="primary" />
-            )}
-          </div>
-
-          <div className="lap-gap-evolution">
-            {data_lap_gap_evolution && !loadingState ? (
-              <LapGapEvolution
-                lapGaps={data_lap_gap_evolution.lapGaps}
-                sessionYears={sessionYears}
-                corners={data_lap_gap_evolution.corners}
-                driverColorMap={driverColorMap}
-              />
-            ) : (
-              <CircularProgress size={50} color="primary" />
-            )}
-          </div>
+        <div className="lap-gap-evolution-chart">
+          {data_lap_gap_evolution && !loadingState ? (
+            <LapGapEvolution
+              lapGaps={data_lap_gap_evolution.lapGaps}
+              sessionYears={sessionYears}
+              corners={data_lap_gap_evolution.corners}
+              driverColorMap={driverColorMap}
+            />
+          ) : (
+            <CircularProgress size={50} color="primary" />
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
