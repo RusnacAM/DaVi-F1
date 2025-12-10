@@ -261,7 +261,7 @@ def get_track_dominance(
         "Label": result_telemetry["Label"]
     })
 
-    return result.to_dict(orient="records")
+    return result.to_dict(orient='records')
 
 
 
