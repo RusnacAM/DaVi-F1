@@ -16,13 +16,14 @@ export interface Corner {
 export interface LapGapEvolutionResponse {
     lapGaps: Record<string, LapGapEvolutionPoint[]>;
     corners: Corner[];
+    fastest_driver: string;
 }
 
 export const fetchLapGapEvolution = async (
     sessionName: string,
     identifier: string,
     drivers: string[],
-    sessionYears: string[]
+    sessionYears: string[],
 ): Promise<LapGapEvolutionResponse> => {
     const driverCodes = drivers.map(d => driverCode[d]);
     let driversParam = "";
