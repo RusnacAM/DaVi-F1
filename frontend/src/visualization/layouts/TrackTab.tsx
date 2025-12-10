@@ -32,11 +32,7 @@ export const TrackTab: React.FC<TrackTabProps> = ({
 }) => {
   const [data, setData] = useState<TrackDominanceResponse>([]);
   const [AvgDiffsData, setDataAvgDiffs] = useState<AvgDiffsResponse>([]);
-  const [data_lap_gap_evolution, setDataLapGapEvolution] =
-    useState<LapGapEvolutionResponse>({
-      lapGaps: {},
-      corners: [],
-    });
+  const [data_lap_gap_evolution, setDataLapGapEvolution] = useState<LapGapEvolutionResponse>({lapGaps: {}, corners: [],});
   const [loadingState, setLoadingState] = useState(false);
 
   const fetchData = async () => {

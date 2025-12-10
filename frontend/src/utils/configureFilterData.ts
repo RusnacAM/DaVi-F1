@@ -43,6 +43,11 @@ export function getDriverYearColor(
   const baseColor = d3.color(driverColorMap[code])!;
   const yearIndex = sessionYears.indexOf(year);
 
+  if (!baseColor) {
+    console.warn(`Invalid color for driver code: ${code}`);
+    return "rgb(128,128,128)";
+  }
+
   if (yearIndex === 1) {
     return d3.color(baseColor.brighter(1.1))!.formatRgb();
   }
