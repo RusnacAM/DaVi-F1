@@ -32,7 +32,7 @@ export const TrackTab: React.FC<TrackTabProps> = ({
 }) => {
   const [data, setData] = useState<TrackDominanceResponse>([]);
   const [AvgDiffsData, setDataAvgDiffs] = useState<AvgDiffsResponse>([]);
-  const [data_lap_gap_evolution, setDataLapGapEvolution] = useState<LapGapEvolutionResponse>({lapGaps: {}, corners: [],});
+  const [data_lap_gap_evolution, setDataLapGapEvolution] = useState<LapGapEvolutionResponse>({lapGaps: {}, corners: [], fastest_driver: " "});
   const [loadingState, setLoadingState] = useState(false);
 
   const fetchData = async () => {
@@ -106,6 +106,7 @@ export const TrackTab: React.FC<TrackTabProps> = ({
               lapGaps={data_lap_gap_evolution.lapGaps}
               sessionYears={sessionYears}
               corners={data_lap_gap_evolution.corners}
+              fastest_driver={data_lap_gap_evolution.fastest_driver}
               driverColorMap={driverColorMap}
             />
           ) : (

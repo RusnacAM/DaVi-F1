@@ -21,8 +21,8 @@ export const FilterConfigsProvider: React.FC<{
 }) => {
 
     const [sessionYears, setSessionYears] = useState<string[]>(["2025","2024"]);
-    const [sessionName, setSessionName] = useState<string>("Japanese Grand Prix");
-    const [sessionIdentifier, setSessionIdentifier] = useState<string>("Qualifying")
+    const [sessionName, setSessionName] = useState<string>("Bahrain Grand Prix");
+    const [sessionIdentifier, setSessionIdentifier] = useState<string>("Qualifying");
     const [driverNames, setDriverNames] = useState<string[]>(["Lando Norris","Oscar Piastri"]);
 
     return (

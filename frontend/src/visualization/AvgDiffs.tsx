@@ -122,15 +122,13 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({
       .enter()
       .append("rect")
       .attr("x", (d) => x1(d.key)!)
-      // Logic: If value > 0, rect starts at y(value) and goes down to baselineY.
-      // If value < 0, rect starts at baselineY and goes down to y(value).
-      // Math.min handles the "start y" correctly for both cases relative to SVG coords.
       .attr("y", (d) => Math.min(y(d.value), baselineY))
       .attr("width", x1.bandwidth())
       .attr("height", (d) => Math.abs(y(d.value) - baselineY))
       .attr("fill", (d) => colorScale(d.key))
       .attr("fill-opacity", 1)
       .attr("stroke", "none")
+
       // Tooltip Interactions
       .on("mouseenter", function (event: any, d: any) {
         const [drv, yr] = d.key.split("_");
@@ -174,7 +172,9 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({
       .attr("x2", INNER_W)
       .attr("y1", baselineY)
       .attr("y2", baselineY)
-      .attr("stroke", "#fff")
+      .attr("stroke", () => {
+        return colorScale(fastestDriverYear);
+         })
       .attr("stroke-width", 1)
       .attr("stroke-opacity", 0.5);
 
@@ -198,8 +198,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({
     // Title
     const titleText = fastestDriverYear
       ? [
-          `Fastest driver: ${fastestDriverYear.split("_")[0]} (${fastestDriverYear.split("_")[1]})`,
-          "Average time loss to fastest driver",
+          `Average loss to fastest driver (${fastestDriverYear.split("_")[0]} ${fastestDriverYear.split("_")[1].slice(2,4)})`,
         ]
       : ["Avg Time Loss to Fastest"];
 

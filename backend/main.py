@@ -194,8 +194,6 @@ def get_track_dominance(
                 labels[minisector] = 'Fast'
             else:
                 labels[minisector] = 'Straight'
-
-    print(labels)
         
 
     # ---- Dominance Calculation ---- #
@@ -242,12 +240,9 @@ def get_track_dominance(
     result_telemetry["Driver"] = result_telemetry["Fastest"].str.split('_').str[0]
     result_telemetry["Year"] = result_telemetry["Fastest"].str.split('_').str[1].astype(int)
 
-    #test print
-    print("TEST \n")
+
     result_telemetry['TimeGainFastest'] = pd.to_timedelta(result_telemetry['TimeGainFastest'], errors='coerce')
-    result_telemetry['TimeGainFastest'] = result_telemetry["TimeGainFastest"].dt.total_seconds()
-    print(result_telemetry["TimeGainFastest"].head())
-    print("TEST2")
+    result_telemetry['TimeGainFastest'] = result_telemetry["TimeGainFastest"].dt.total_seconds().map('{:.3f}'.format)
 
     # Final selection
     result = pd.DataFrame({
@@ -522,6 +517,8 @@ def get_average_loss_to_fastest(session_name: str, identifier: str, drivers: lis
         .reset_index()
     )
 
+    result_df['Diff_to_Fastest_sec'] = result_df['Diff_to_Fastest_sec'].round(3)
+
     # Add metadata columns
     result_df['FastestOverallDriver'] = fastest_driver_overall
     result_df['FastestOverallYear'] = fastest_year_overall
@@ -662,7 +659,7 @@ def get_lap_gap_evolution(
         lap_gap = lap_gap.sort_values(by="x").dropna()
         
         # Trim edges to remove artifacts
-        # Remove 5 points from start/end (approx covers the smoothing window radius)
+        # Remove 10 points from start/end (approx covers the smoothing window radius)
         if len(lap_gap) > 20:
             lap_gap = lap_gap.iloc[10:-10]
     
@@ -677,10 +674,11 @@ def get_lap_gap_evolution(
         for _, corner in circuit_info.corners.iterrows():
             corners.append({
                 "distance": float(corner["Distance"]),
-                "label": f"{corner['Number']}{corner['Letter']}",
+                "label": f"{corner['Number']}{corner['Letter']}"
             })
 
     return {
         "lapGaps": result,
-        "corners": corners          
+        "corners": corners,  
+        "fastest_driver": ref_id,
     }
