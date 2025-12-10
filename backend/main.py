@@ -166,6 +166,8 @@ def get_track_dominance(
         # Create n+1 linspace bounds
         sector_bounds = np.linspace(0, total_dist, num_minisectors + 1)
 
+    sector_bounds = [round(s,0) for s in sector_bounds]
+
     # Assign Minisectors
     telemetry_all['Minisector'] = np.digitize(
         telemetry_all['Distance'], bins=sector_bounds, right=False
@@ -182,7 +184,9 @@ def get_track_dominance(
         sector_speeds = reference_telemetry.groupby('Minisector')['Speed'].min()
         labels = {}
         for minisector, speed in sector_speeds.items():
-            if speed < 100:
+            if minisector > num_minisectors:
+                break
+            elif speed < 100:
                 labels[minisector] = 'Slow'
             elif speed < 200:
                 labels[minisector] = 'Medium'
@@ -190,6 +194,9 @@ def get_track_dominance(
                 labels[minisector] = 'Fast'
             else:
                 labels[minisector] = 'Straight'
+
+    print(labels)
+        
 
     # ---- Dominance Calculation ---- #
     # Group by Sector and Driver, calculate Duration (Max SessionTime - Min SessionTime)
@@ -235,6 +242,13 @@ def get_track_dominance(
     result_telemetry["Driver"] = result_telemetry["Fastest"].str.split('_').str[0]
     result_telemetry["Year"] = result_telemetry["Fastest"].str.split('_').str[1].astype(int)
 
+    #test print
+    print("TEST \n")
+    result_telemetry['TimeGainFastest'] = pd.to_timedelta(result_telemetry['TimeGainFastest'], errors='coerce')
+    result_telemetry['TimeGainFastest'] = result_telemetry["TimeGainFastest"].dt.total_seconds()
+    print(result_telemetry["TimeGainFastest"].head())
+    print("TEST2")
+
     # Final selection
     result = pd.DataFrame({
         "x": result_telemetry["X"],
@@ -243,7 +257,7 @@ def get_track_dominance(
         "fastest": result_telemetry["Fastest"],
         "driver": result_telemetry["Driver"],
         "year": result_telemetry["Year"],
-        "TimeGainFastest": result_telemetry["TimeGainFastest"].round(3),
+        "TimeGainFastest": result_telemetry["TimeGainFastest"],
         "Label": result_telemetry["Label"]
     })
 
@@ -450,11 +464,12 @@ def get_average_loss_to_fastest(session_name: str, identifier: str, drivers: lis
     )
 
     ### ---- Add mini sector labels ---- ### 
+    
     if session_name in label_dict:
         labels = label_dict.get(session_name, {})
     else:
         # Calculate labels based on the VALID reference telemetry
-        sector_speeds = reference_telemetry.groupby('Minisector')['Speed'].min()
+        sector_speeds = telemetry_all.groupby('Minisector')['Speed'].min()
 
         labels = {}
         for minisector, speed in sector_speeds.items():
@@ -466,6 +481,7 @@ def get_average_loss_to_fastest(session_name: str, identifier: str, drivers: lis
                 labels[minisector] = 'Fast'
             else:
                 labels[minisector] = 'Straight'
+        
 
     # Add labels to main dataframe
     telemetry_all['MinisectorLabel'] = telemetry_all['Minisector'].map(labels)
@@ -584,8 +600,8 @@ def get_lap_gap_evolution(
     result = {}
     
     # Configuration
-    TARGET_POINTS = 800  # Number of points to plot
-    SMOOTHING_WINDOW = 15 # Filter strength (Higher = Smoother but less detail)
+    TARGET_POINTS = 800 
+    SMOOTHING_WINDOW = 15
     
     ### ---- Calculate Gaps ---- ###
     for entry in lap_data_list:
@@ -599,7 +615,7 @@ def get_lap_gap_evolution(
         d_dist = entry["distance"]
         d_time = entry["time_series"]
         
-        # 1. Downsample INPUT data (optimization)
+        # 1. Downsample INPUT data
         if len(d_x) > TARGET_POINTS:
             step = len(d_x) // TARGET_POINTS
             d_x = d_x[::step]
@@ -612,7 +628,7 @@ def get_lap_gap_evolution(
         # 2. Spatial Query
         dists, indices = ref_tree.query(driver_coords, k=2)
         
-        # 3. Disambiguate Matches (Fix crossovers/bridges)
+        # 3. Disambiguate Matches
         idx_0 = indices[:, 0]
         idx_1 = indices[:, 1]
         
@@ -629,8 +645,7 @@ def get_lap_gap_evolution(
         ref_time_at_match = ref_time_series[chosen_indices]
         gap_series_raw = d_time - ref_time_at_match
         
-        # 5. Apply Smoothing (Moving Average)
-        # This removes the jagged noise seen in your screenshot
+        # 5. Apply Smoothing
         gap_series_smooth = pd.Series(gap_series_raw).rolling(
             window=SMOOTHING_WINDOW, 
             center=True, 
@@ -648,9 +663,10 @@ def get_lap_gap_evolution(
 
         lap_gap = lap_gap.sort_values(by="x").dropna()
         
-        # Remove finish line artifact
-        if not lap_gap.empty:
-            lap_gap = lap_gap.iloc[:-1]
+        # Trim edges to remove artifacts
+        # Remove 5 points from start/end (approx covers the smoothing window radius)
+        if len(lap_gap) > 20:
+            lap_gap = lap_gap.iloc[10:-10]
     
         result[driver_year] = lap_gap.to_dict(orient="records")
 
