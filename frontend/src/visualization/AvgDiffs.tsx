@@ -224,7 +224,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({
     return () => {
       tooltip.remove();
     };
-  }, [data, driverColorMap, sessionYears]);
+  }, [data]);
 
   return (
     <div style={{ overflowX: "auto" }}>

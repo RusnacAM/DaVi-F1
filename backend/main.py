@@ -243,11 +243,11 @@ def get_track_dominance(
         "fastest": result_telemetry["Fastest"],
         "driver": result_telemetry["Driver"],
         "year": result_telemetry["Year"],
-        "TimeGainFastest": result_telemetry["TimeGainFastest"].round(3),
+        "TimeGainFastest": result_telemetry["TimeGainFastest"],
         "Label": result_telemetry["Label"]
     })
 
-    return result.to_dict(orient="records")
+    return result.to_dict(orient='records')
 
 
 

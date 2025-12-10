@@ -249,7 +249,7 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                 .attr("font-size", "10px")
                 .text(corner.label);
         });
-    }, [lapGaps, corners, driverColorMap, sessionYears]);
+    }, [lapGaps, corners]);
 
     return <svg ref={svgRef} width={800} height={325}></svg>;
 };
