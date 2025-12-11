@@ -11,20 +11,23 @@ export interface Corner {
 export interface LapGapEvolutionProps {
     lapGaps: Record<string, LapGapEvolutionPoint[]>;
     corners: Corner[];
+    fastest_driver: string;
     sessionYears: string[];
     driverColorMap: Record<string, string>;
 }
 
 export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
     lapGaps,
-    sessionYears,
     corners,
+    fastest_driver,
+    sessionYears,
     driverColorMap,
 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
 
     useEffect(() => {
-        if (!lapGaps || Object.keys(lapGaps).length === 0) return;
+        // Ensure we have data before drawing
+        //if (!lapGaps || Object.keys(lapGaps).length === 0 || !fastest_driver) return;
 
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove();
@@ -49,18 +52,17 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
         svg
             .append("text")
             .attr("x", width / 2)
-            .attr("y", margin.top / 2)
+            .attr("y", margin.top / 3)
             .attr("text-anchor", "middle")
             .attr("fill", "white")
             .attr("font-size", "16px")
             .attr("font-weight", "bold")
-            .text(`Lap Gap Evolution to fastest driver with corner identification`);
+            .text(`Gap Evolution`);
 
         // Scales
         const xExtent = d3.extent(allPoints, (d) => d.x) as [number, number];
         
-        // Fix: d3.extent only sees 'slower' drivers (gaps > 0). 
-        // We must manually include 0 in the domain to represent the reference driver correctly.
+        // Scale Y: Include 0 manually to ensure the reference line is always visible
         const yMin = d3.min(allPoints, (d) => d.y) || 0;
         const yMax = d3.max(allPoints, (d) => d.y) || 0;
 
@@ -69,11 +71,11 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
             .range([0, innerWidth]);
 
         const yScale = d3.scaleLinear()
-            .domain([Math.min(0, yMin), Math.max(0, yMax)]) // Ensure 0 is included
-            .nice() // Round the domain nicely
+            .domain([Math.min(0, yMin), Math.max(0, yMax)]) 
+            .nice()
             .range([innerHeight, 0]);
 
-        const colorScale = (fastest: string) => getDriverYearColor(fastest, driverColorMap, sessionYears);
+        const colorScale = (driverKey: string) => getDriverYearColor(driverKey, driverColorMap, sessionYears);
 
         // X Axis
         g.append("g")
@@ -110,16 +112,19 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
             .style("fill", "#fff")
             .text("Time Difference (s)");
 
-        // Draw reference driver as horizontal line y=0
+        // --- Draw Reference Driver (Horizontal Line at 0) ---
         g.append("line")
             .attr("x1", 0)
             .attr("y1", yScale(0))
             .attr("x2", innerWidth)
             .attr("y2", yScale(0))
-            .attr("stroke", "white")
+            .attr("stroke", () => {
+                const key = fastest_driver.replace(" ", "_");
+                return colorScale(key);
+            })
             .attr("stroke-dasharray", "5,5")
             .attr("stroke-width", 2)
-            .attr("opacity", 0.5);
+            .attr("opacity", 0.8); // Increased opacity for visibility
 
         // Line generator
         const line = d3
@@ -132,7 +137,6 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
             g.append("path")
                 .datum(lapGaps[driverKey])
                 .attr("stroke", () => {
-                    // Backend sends "VER 2023", Map expects "VER_2023"
                     const key = driverKey.replace(" ", "_");
                     return colorScale(key);
                 })
@@ -176,18 +180,17 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                 const [mx] = d3.pointer(event);
                 const x0 = xScale.invert(mx);
 
-                // Build tooltip content
-                // Gather data points at this X
+                // 1. Gather data for regular drivers
                 const currentData = Object.keys(lapGaps).map((driverKey) => {
                     const points = lapGaps[driverKey];
                     const bisect = d3.bisector((d: LapGapEvolutionPoint) => d.x).left;
                     const i = bisect(points, x0);
-                    // Handle edge cases for bisect
+                    // Handle edge cases safely
                     const point = points[Math.min(i, points.length - 1)] || points[points.length - 1];
-                    return { key: driverKey, gap: point.y };
+                    return { key: driverKey, gap: point ? point.y : 0 };
                 });
 
-                // Sort by gap size (descending) so the list order roughly matches line height
+                // Sort by gap size (descending) so the list order roughly matches visual line height
                 currentData.sort((a, b) => b.gap - a.gap);
 
                 tooltipText.selectAll("*").remove();
@@ -249,7 +252,9 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                 .attr("font-size", "10px")
                 .text(corner.label);
         });
-    }, [lapGaps, corners]);
+        
+    // Added correct dependencies so chart updates when props change
+    }, [lapGaps, corners, fastest_driver, sessionYears, driverColorMap]);
 
     return <svg ref={svgRef} width={800} height={325}></svg>;
 };
