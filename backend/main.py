@@ -256,18 +256,17 @@ def get_track_dominance(
 
 @app.get("/api/v1/braking-comparison")
 def braking_comparison(
-    session_year: str,  # Can be comma-separated: "2024,2025"
+    session_year: str,
     session_name: str,
     identifier: str,
-    drivers: str  # Can be comma-separated: "VER,LEC"
+    drivers: str
 ):
-    # Parse comma-separated values
     years = [int(y.strip()) for y in session_year.split(",")]
     driver_codes = [d.strip() for d in drivers.split(",")]
     
     all_results = []
     
-    # Find the overall fastest lap across all years and drivers (the "ideal")
+    # Find the overall fastest lap across all years and drivers
     fastest_lap = None
     fastest_time = float('inf')
     
@@ -286,10 +285,9 @@ def braking_comparison(
     if fastest_lap is None:
         return {"error": "No valid laps found"}
     
-    # Get ideal brake from the fastest lap
+    # Get ACTUAL brake telemetry from the fastest lap (not gradient!)
     ideal_telemetry = fastest_lap.get_telemetry().add_distance()
-    ideal_speed = ideal_telemetry["Speed"].values
-    ideal_brake = (np.gradient(ideal_speed) < -1.5).astype(int)
+    ideal_brake = ideal_telemetry["Brake"].astype(int).values  
     ideal_distance = ideal_telemetry["Distance"].values
     
     # Now get each driver's brake data
@@ -314,7 +312,7 @@ def braking_comparison(
                 # Create result for this driver-year combo
                 df = pd.DataFrame({
                     "distance": ideal_distance,
-                    "ideal_brake": ideal_brake,
+                    "ideal_brake": ideal_brake,  
                     "driver_brake": driver_brake_aligned,
                     "driver": driver_code,
                     "year": year
