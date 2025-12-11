@@ -153,9 +153,12 @@ export default function BrakingDistributionBoxPlot({ data, dynamicHeight }: Prop
     // Title
     svg.append("text")
       .attr("x", width / 2)
-      .attr("y", 24)
+      .attr("y", margin.top / 3)
       .attr("text-anchor", "middle")
-      .attr("fill", "white");
+      .attr("fill", "white")
+      .attr("font-size", "16px")
+      .attr("font-weight", "bold")
+      .text("Braking Distance Distribution");
   }, [data, width, dynamicHeight]);
 
   return (

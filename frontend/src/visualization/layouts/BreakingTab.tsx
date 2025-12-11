@@ -72,11 +72,13 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
         display: "flex",
         flexDirection: "column",
         width: "100%",
+        height: "100%",
         maxWidth: "100%",
         gap: "1px",
         overflowX: "hidden",
         overflowY: "auto",
         alignItems: "center",
+        justifyContent: "center",
         padding: "1px 0",
       }}
     >
@@ -92,10 +94,6 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
       >
         {/* LEFT: Braking Comparison (60%) */}
         <section style={{ width: "60%", minWidth: 0 }}>
-          <h3 style={{ color: "white", marginBottom: "10px" }}>
-            Braking Comparison
-          </h3>
-
           {loadingState ? (
             <div
               style={{
@@ -127,10 +125,6 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
             minWidth: 0,
           }}
         >
-          <h3 style={{ color: "white", marginBottom: "10px" }}>
-            Braking Distance Distribution
-          </h3>
-
           {loadingState ? (
             <div
               style={{
