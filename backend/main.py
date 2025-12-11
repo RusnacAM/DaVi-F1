@@ -265,41 +265,68 @@ def get_track_dominance(
 
 @app.get("/api/v1/braking-comparison")
 def braking_comparison(
-    session_year: str,  # Can be comma-separated: "2024,2025"
+    session_year: str,
     session_name: str,
     identifier: str,
-    drivers: str  # Can be comma-separated: "VER,LEC"
+    drivers: str
 ):
-    # Parse comma-separated values
     years = [int(y.strip()) for y in session_year.split(",")]
     driver_codes = [d.strip() for d in drivers.split(",")]
     
-    all_results = []
-    
-    # Find the overall fastest lap across all years and drivers (the "ideal")
+    # Find the overall fastest lap across ALL drivers (not just selected ones)
     fastest_lap = None
     fastest_time = float('inf')
+    fastest_driver = None
+    fastest_year = None
     
     for year in years:
         try:
             session = get_loaded_session(year, session_name, identifier)
-            for driver_code in driver_codes:
-                lap = session.laps.pick_drivers(driver_code).pick_fastest()
-                if lap is not None and lap['LapTime'].total_seconds() < fastest_time:
-                    fastest_time = lap['LapTime'].total_seconds()
-                    fastest_lap = lap
+            # Get fastest lap from ALL drivers in the session
+            all_laps = session.laps.pick_quicklaps()  # Filter for quick laps only
+            if len(all_laps) > 0:
+                fastest_session_lap = all_laps.pick_fastest()
+                if fastest_session_lap is not None:
+                    lap_time = fastest_session_lap['LapTime'].total_seconds()
+                    if lap_time < fastest_time:
+                        fastest_time = lap_time
+                        fastest_lap = fastest_session_lap
+                        fastest_driver = fastest_session_lap['Driver']
+                        fastest_year = year
         except Exception as e:
-            print(f"Error loading session {year}/{driver_code}: {e}")
+            print(f"Error loading session {year}: {e}")
             continue
     
     if fastest_lap is None:
         return {"error": "No valid laps found"}
     
-    # Get ideal brake from the fastest lap
+    print(f"Ideal lap: {fastest_driver} from {fastest_year} with time {fastest_time}s")
+    
+    # Get ACTUAL brake telemetry from the fastest lap
     ideal_telemetry = fastest_lap.get_telemetry().add_distance()
-    ideal_speed = ideal_telemetry["Speed"].values
-    ideal_brake = (np.gradient(ideal_speed) < -1.5).astype(int)
+    ideal_brake = ideal_telemetry["Brake"].astype(int).values  
     ideal_distance = ideal_telemetry["Distance"].values
+    
+    # Dictionary to store results by driver_year key
+    all_results = {}
+    
+    # Check if ideal lap driver-year combo is in selected drivers
+    ideal_combo_selected = any(
+        year == fastest_year and driver_code == fastest_driver 
+        for year in years 
+        for driver_code in driver_codes
+    )
+    
+    # If ideal lap is NOT selected, add it as a separate entry
+    if not ideal_combo_selected:
+        df = pd.DataFrame({
+            "distance": ideal_distance,
+            "ideal_brake": ideal_brake,
+            "driver_brake": ideal_brake,  # Use same brake data for display
+            "driver": fastest_driver,
+            "year": fastest_year
+        })
+        all_results["ideal"] = df.to_dict(orient="records")
     
     # Now get each driver's brake data
     for year in years:
@@ -320,33 +347,27 @@ def braking_comparison(
                 f_brake = interp1d(distance, driver_brake, bounds_error=False, fill_value=0)
                 driver_brake_aligned = f_brake(ideal_distance)
                 
+                # Determine if this is the ideal lap
+                is_ideal = (year == fastest_year and driver_code == fastest_driver)
+                
                 # Create result for this driver-year combo
                 df = pd.DataFrame({
                     "distance": ideal_distance,
-                    "ideal_brake": ideal_brake,
+                    "ideal_brake": ideal_brake if is_ideal else 0,  # Only set for the actual ideal lap
                     "driver_brake": driver_brake_aligned,
                     "driver": driver_code,
                     "year": year
                 })
                 
-                all_results.append(df.to_dict(orient="records"))
+                # Use the year_driver format as key (matching frontend expectations)
+                key = f"{year}_{driver_code}"
+                all_results[key] = df.to_dict(orient="records")
                 
         except Exception as e:
             print(f"Error processing {year}/{driver_code}: {e}")
             continue
     
-    # Return as a dictionary with driver_year keys
-    result = {}
-    idx = 0
-    for year in years:
-        for driver_code in driver_codes:
-            if idx < len(all_results):
-                key = f"{year}_{driver_code}"
-                result[key] = all_results[idx]
-                idx += 1
-    
-    return result
-
+    return all_results
 
 @app.get("/api/v1/braking-distribution")
 def get_braking_distribution(

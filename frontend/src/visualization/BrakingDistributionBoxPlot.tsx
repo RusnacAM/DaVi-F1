@@ -1,25 +1,24 @@
+// BrakingDistributionBoxPlot.tsx
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import type { BrakingDistributionPoint } from "../api/fetchBrakingDistribution";
 
 interface Props {
   data: BrakingDistributionPoint[];
+  dynamicHeight?: number;
 }
 
-export default function BrakingDistributionBoxPlot({ data }: Props) {
+export default function BrakingDistributionBoxPlot({ data, dynamicHeight }: Props) {
   const ref = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [dimensions, setDimensions] = useState({ width: 400, height: 400 });
+  const [width, setWidth] = useState(400);
 
-  // Update dimensions when container resizes
+  // Update width when container resizes
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.offsetWidth;
-        setDimensions({
-          width: containerWidth,
-          height: 400
-        });
+        setWidth(containerWidth);
       }
     };
 
@@ -29,13 +28,16 @@ export default function BrakingDistributionBoxPlot({ data }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!data.length || !ref.current) return;
+    if (!ref.current) return;
 
     const svg = d3.select(ref.current);
     svg.selectAll("*").remove();
 
-    const { width, height } = dimensions;
-    const margin = { top: 40, right: 20, bottom: 80, left: 60 };
+    // If dynamicHeight provided, use it; otherwise fallback to default.
+    const height = dynamicHeight ?? 400;
+    const margin = { top: 60, right: 20, bottom: 50, left: 60 }; // MATCHES BrakingComparison (top=60, bottom=50)
+    const innerWidth = width;
+    const innerHeight = height;
 
     svg.attr("width", width).attr("height", height);
     
@@ -151,10 +153,13 @@ export default function BrakingDistributionBoxPlot({ data }: Props) {
     // Title
     svg.append("text")
       .attr("x", width / 2)
-      .attr("y", 24)
+      .attr("y", margin.top / 3)
       .attr("text-anchor", "middle")
       .attr("fill", "white")
-  }, [data, dimensions]);
+      .attr("font-size", "16px")
+      .attr("font-weight", "bold")
+      .text("Braking Distance Distribution");
+  }, [data, width, dynamicHeight]);
 
   return (
     <div ref={containerRef} style={{ width: "100%", height: "100%" }}>

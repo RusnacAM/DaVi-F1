@@ -47,7 +47,7 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
     svg.selectAll("*").remove();
 
     const height = 300;
-    const margin = { top: 60, right: 40, bottom: 50, left: 80 };
+    const margin = { top: 10, right: 10, bottom: 50, left: 60 };
 
     const allPoints = Object.entries(data).flatMap(([key, points]) =>
       points.map((p) => ({
@@ -125,35 +125,6 @@ export const TelemetryLineChart: React.FC<TelemetryLineChartProps> = ({
       .style("font-size", "12px")
       .text(label);
 
-    // Legend
-    const legend = svg
-      .append("g")
-      .attr("transform", `translate(${margin.left + 10}, 10)`);
-
-    const itemsPerRow = 4;
-    yearDriverKeys.forEach((key, i) => {
-      const row = Math.floor(i / itemsPerRow);
-      const col = i % itemsPerRow;
-      const xOffset = col * 120;
-      const yOffset = row * 20;
-
-      legend
-        .append("line")
-        .attr("x1", xOffset)
-        .attr("x2", xOffset + 20)
-        .attr("y1", yOffset + 6)
-        .attr("y2", yOffset + 6)
-        .attr("stroke", colorScale(key))
-        .attr("stroke-width", 2);
-
-      legend
-        .append("text")
-        .attr("x", xOffset + 25)
-        .attr("y", yOffset + 10)
-        .text(key.replace("_", " "))
-        .attr("font-size", 11)
-        .attr("fill", "white");
-    });
     const updateTooltip = (mouseX: number, dist: number) => {
       if (!tooltipRef.current) return;
 
