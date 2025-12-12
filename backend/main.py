@@ -8,7 +8,7 @@ import math
 from scipy import interpolate
 from scipy.spatial import cKDTree
 
-from utils.sectors import sector_dict, label_dict, labels_spanish, labels_bahrain, labels_austria, labels_italy, labels_britian, labels_abuDhabi
+from utils.sectors import sector_dict, label_dict
 from typing import List
 from functools import lru_cache
 
