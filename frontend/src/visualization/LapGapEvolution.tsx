@@ -199,7 +199,7 @@ export const LapGapEvolution: React.FC<LapGapEvolutionProps> = ({
                     tooltipText.append("tspan")
                         .attr("x", 10)
                         .attr("y", 20 + index * 15)
-                        .text(`${d.key}: ${d.gap.toFixed(3)} s`);
+                        .text(`${d.key.replace("20","")}: ${d.gap.toFixed(3)} s`);
                 });
 
                 const bbox = tooltipText.node()?.getBBox();

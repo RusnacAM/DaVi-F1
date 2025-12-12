@@ -49,7 +49,7 @@ export function getDriverYearColor(
   }
 
   if (yearIndex === 1) {
-    return d3.color(baseColor.brighter(1.1))!.formatRgb();
+    return d3.color(baseColor.brighter(1.5))!.formatRgb();
   }
 
   return baseColor.formatRgb();

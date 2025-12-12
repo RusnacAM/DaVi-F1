@@ -183,17 +183,17 @@ export const BrakingComparison: React.FC<Props> = ({
       .attr("fill", "white")
       .attr("text-anchor", "middle")
       .style("font-size", "12px")
-      .text("Distance along lap [m]");
+      .text("Distance along lap (m)");
 
     // Y-axis
     g.append("g")
       .call(
         d3
           .axisLeft(y)
-          .tickFormat((d) =>
+          .tickFormat(d =>
             d === "ideal"
               ? "Fastest"
-              : d.replace("_", " ")
+              : `${d.split("_")[1]} ${d.split("_")[0].replace("20","")}`
           )
       )
       .selectAll("text")
@@ -233,7 +233,7 @@ export const BrakingComparison: React.FC<Props> = ({
           const arr = data[key];
           const i = Math.max(0, Math.min(arr.length - 1, bisect(arr, dist)));
           const d = arr[i];
-          html += `<div><strong>${key.replace("_", " ")}:</strong> ${
+          html += `<div><strong>${`${key.split("_")[1]} ${key.split("_")[0].replace("20","")}`}:</strong> ${
             d.driver_brake >= 0.5 ? "Braking" : "Not braking"
           }</div>`;
         });
