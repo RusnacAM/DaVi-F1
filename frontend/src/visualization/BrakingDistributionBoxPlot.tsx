@@ -132,7 +132,7 @@ export default function BrakingDistributionBoxPlot({ data, dynamicHeight }: Prop
       .style("text-anchor", "end")
       .attr("dx", "-0.5em")
       .attr("dy", "0.15em")
-      .text(d => String(d).replace("_", " "));
+      .text(d => `${String(d).split("_")[1]} ${String(d).split("_")[0].replace("20","")}`);
 
     svg.append("g")
       .attr("transform", `translate(${margin.left},0)`)

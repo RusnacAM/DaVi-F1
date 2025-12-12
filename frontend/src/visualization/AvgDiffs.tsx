@@ -131,7 +131,7 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({
 
       // Tooltip Interactions
       .on("mouseenter", function (event: any, d: any) {
-        const [drv, yr] = d.key.split("_");
+        const [drv, yr] = d.key.replace("20","").split("_");
         tooltip
           .html(
             `<div style="font-weight:600;margin-bottom:2px">${drv} ${yr}</div><div style="font-size:11px">${Number(
@@ -193,12 +193,12 @@ export const AvgDiffsChart: React.FC<AvgDiffsChartProps> = ({
       .attr("text-anchor", "middle")
       .style("font-weight", "bold")
       .style("fill", "#fff")
-      .text("Time loss (s)");
+      .text("Time Delta (s)");
 
     // Title
     const titleText = fastestDriverYear
       ? [
-          `Average loss to fastest driver (${fastestDriverYear.split("_")[0]} ${fastestDriverYear.split("_")[1].slice(2,4)})`,
+          `Time Delta to Fastest Driver (${fastestDriverYear.split("_")[0]} ${fastestDriverYear.split("_")[1].slice(2,4)})`,
         ]
       : ["Avg Time Loss to Fastest"];
 
