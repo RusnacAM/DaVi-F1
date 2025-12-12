@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import BrakingDistributionBoxPlot from "../BrakingDistributionBoxPlot";
 import {
-  fetchTelemetry,
-  type TelemetryResponse,
-} from "../../api/fetchTelemetry";
-import {
   fetchBrakingDistribution,
   type BrakingDistributionPoint,
 } from "../../api/fetchBrakingDistribution";
@@ -13,7 +9,6 @@ import {
   type BrakingPoint,
 } from "../../api/fetchBrakingComparison";
 import { BrakingComparison } from "../BrakingComparison";
-import { TelemetryLineChart } from "../../components/TelemetryLineChart";
 import { CircularProgress } from "@mui/material";
 
 export interface BreakingTabProps {
@@ -33,22 +28,15 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
   refreshKey,
   driverColorMap,
 }) => {
-  const [telemetryData, setTelemetryData] = useState<TelemetryResponse | null>(null);
   const [brakingData, setBrakingData] = useState<Record<string,BrakingPoint[]> | null>(null);
   const [brakingDist, setBrakingDist] = useState<BrakingDistributionPoint[]>([]);
   const [loadingState, setLoadingState] = useState(false);
+  const [comparisonHeight, setComparisonHeight] = useState<number | null>(null);
 
   const fetchData = async () => {
     try {
       setLoadingState(true);
       const brakingResp = await fetchBrakingComparison(
-        sessionYears,
-        sessionName,
-        sessionIdentifier,
-        driverNames
-      );
-
-      const telemetryResp = await fetchTelemetry(
         sessionYears,
         sessionName,
         sessionIdentifier,
@@ -64,11 +52,6 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
 
       setBrakingData(
         brakingResp && Object.keys(brakingResp).length ? brakingResp : null
-      );
-      setTelemetryData(
-        telemetryResp && Object.keys(telemetryResp).length
-          ? telemetryResp
-          : null
       );
       setBrakingDist(brakingDistResp);
     } catch (error) {
@@ -89,85 +72,74 @@ export const BreakingTab: React.FC<BreakingTabProps> = ({
         display: "flex",
         flexDirection: "column",
         width: "100%",
+        height: "100%",
         maxWidth: "100%",
-        gap: "40px",
-        overflow: "auto",
-        alignItems: "center", // center the children horizontally
-        padding: "10px 0",
+        gap: "1px",
+        overflowX: "hidden",
+        overflowY: "auto",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1px 0",
       }}
     >
-      {/* Braking Comparison */}
-      <section style={{ width: "80%", margin: "0 auto" }}>
-        <h3 style={{ color: "white", marginBottom: "10px" }}>
-          Braking Comparison
-        </h3>
+      {/* TOP ROW: Braking Comparison (left) + Box Plot (right) */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          width: "90%",
+          gap: "20px",
+          alignItems: "flex-start",
+        }}
+      >
+        {/* LEFT: Braking Comparison (60%) */}
+        <section style={{ width: "60%", minWidth: 0 }}>
+          {loadingState ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: "40px 0",
+              }}
+            >
+              <CircularProgress size={50} color="primary" />
+            </div>
+          ) : brakingData ? (
+            <BrakingComparison 
+              data={brakingData} 
+              driverColorMap={driverColorMap} 
+              sessionYears={sessionYears}
+              onHeightChange={setComparisonHeight}
+            />
+          ) : (
+            <div style={{ color: "#ccc" }}>
+              No braking data available for this session/driver.
+            </div>
+          )}
+        </section>
 
-        {loadingState ? (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              padding: "40px 0",
-            }}
-          >
-            <CircularProgress size={50} color="primary" />
-          </div>
-        ) : brakingData ? (
-          <BrakingComparison data={brakingData} driverColorMap={driverColorMap} sessionYears={sessionYears} />
-        ) : (
-          <div style={{ color: "#ccc" }}>
-            No braking data available for this session/driver.
-          </div>
-        )}
-      </section>
-
-      {/* Throttle Line Chart */}
-      <section style={{ width: "80%", margin: "0 auto" }}>
-        <h3 style={{ color: "white", marginBottom: "10px" }}>
-          Throttle Input Comparison
-        </h3>
-
-        {loadingState ? (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              padding: "40px 0",
-            }}
-          >
-            <CircularProgress size={50} color="primary" />
-          </div>
-        ) : telemetryData ? (
-          <TelemetryLineChart
-            data={telemetryData}
-            metric="Throttle"
-            label="Throttle (%)"
-            driverColorMap={driverColorMap}
-            sessionYears={sessionYears}
-          />
-        ) : null}
-      </section>
-
-      {/* Braking Distribution Box Plot */}
-      <section style={{ width: "60%", margin: "0 auto" }}>
-        <h3 style={{ color: "white", marginBottom: "10px" }}>
-          Braking Distance Distribution
-        </h3>
-
-        {loadingState ? (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              padding: "40px 0",
-            }}
-          >
-            <CircularProgress size={50} color="primary" />
-          </div>
-        ) : (
-          <BrakingDistributionBoxPlot data={brakingDist} />
-        )}
-      </section>
+        {/* RIGHT: Braking Distribution Box Plot (40%) */}
+        <section
+          style={{
+            width: "40%",
+            minWidth: 0,
+          }}
+        >
+          {loadingState ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: "40px 0",
+              }}
+            >
+              <CircularProgress size={50} color="primary" />
+            </div>
+          ) : (
+            <BrakingDistributionBoxPlot data={brakingDist} dynamicHeight={comparisonHeight ?? undefined}/>
+          )}
+        </section>
+      </div>
     </div>
   );
 };
